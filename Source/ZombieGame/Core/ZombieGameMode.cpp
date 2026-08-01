@@ -1,11 +1,13 @@
 #include "ZombieGameMode.h"
 #include "ZombieGameState.h"
 #include "ZombiePlayerState.h"
+#include "Characters/Player/ZombiePlayerCharacter.h"
 
 AZombieGameMode::AZombieGameMode()
 {
 	GameStateClass = AZombieGameState::StaticClass();
 	PlayerStateClass = AZombiePlayerState::StaticClass();
+	DefaultPawnClass = AZombiePlayerCharacter::StaticClass();
 }
 
 void AZombieGameMode::AdvanceToNextSector()

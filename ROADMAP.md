@@ -43,9 +43,42 @@ Goal: an empty, cleanly-buildable UE 5.8 C++ project matching the structure in
 
 ## Milestone 2 — Player
 
-Not started. Planned scope: player `Character` built from `HealthComponent`,
-`StaminaComponent`, `InventoryComponent`, `WeaponComponent`, `InteractionComponent`,
-`DamageComponent`; Enhanced Input bindings for movement/aim/sprint/interact/pause.
+- [x] `UHealthComponent` — 100 max HP + armor pool, armor absorbs first (`ApplyDamage`),
+      `Heal`/`AddArmor` hooks for the future Shop/Loot milestones, `OnHealthChanged`/
+      `OnArmorChanged`/`OnDeath` delegates, replicated.
+- [x] `UStaminaComponent` — 100 max, 0.5s recharge delay, 20/sec recharge (both from spec);
+      drain rate is a tunable default (25/sec) since the spec didn't give one. Force-stops
+      sprinting on exhaustion even without an external release event. Replicated.
+- [x] `UDamageComponent` — thin bridge from `AActor::OnTakeAnyDamage` (standard Unreal damage
+      entry point — `UGameplayStatics::ApplyDamage` et al. will drive this from Weapons later)
+      to `HealthComponent::ApplyDamage`. Keeps damage *routing* separate from health/armor
+      *state* so future modifiers (crits, armor-piercing, poison/fire from the PDF's zombie
+      types) plug in here without touching `HealthComponent`.
+- [x] `IInteractable` interface + `UInteractionComponent` — finds the nearest overlapping
+      interactable each tick, `TryInteract()` calls it. No interactable actors exist yet (Shop/
+      Loot/Rooms milestones), but the contract is real and functional now.
+- [x] `AZombiePlayerCharacter` — top-down orthographic camera (`SpringArm` pitched -90°,
+      `Camera` in `Orthographic` projection mode, no lag so the player stays exactly centered
+      per spec), Enhanced Input for Move (WASD, world-space so it stays decoupled from mouse
+      aim), Sprint (Left Shift), Interact (E), Pause (Escape) — all Input Actions/Mapping
+      Context constructed in C++ (`CreateDefaultSubobject`), not editor-authored `.uasset`
+      files, so input setup lives in source control like every other gameplay system. Mouse-aim
+      rotation via cursor deprojection onto the character's own height plane.
+- [x] Wired as `DefaultPawnClass` on `AZombieGameMode`.
+- [x] Clean build verified (0 errors).
+
+**`InventoryComponent` and `WeaponComponent` deliberately deferred to Milestone 3** — both are
+fundamentally about holding/firing weapons, and no weapon type exists yet. Building them now
+would mean either empty shells or loosely-typed placeholders that get reworked anyway; better to
+build them together with `BaseWeapon`/`Hitscan`/`Projectile`.
+
+No visual representation yet (no sprite/flipbook, no mesh) — `ACharacter`'s default mesh slot is
+unset, so the capsule is invisible. That's a separate art-integration pass (Paper2D or billboard
+setup), not part of this milestone's mechanical scope, and there's no level to test in yet
+either. **Still can't "press Play and see something"** after this milestone — that needs at
+minimum a test level with a floor + PlayerStart, which was intentionally skipped earlier.
+
+**Milestone 2 complete.**
 
 ## Milestone 3 — Weapons
 

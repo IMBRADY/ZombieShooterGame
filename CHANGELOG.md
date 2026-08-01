@@ -5,6 +5,20 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Milestone 2 — Player
+
+- Added `UHealthComponent`, `UStaminaComponent`, `UDamageComponent`, `IInteractable` +
+  `UInteractionComponent` under `Source/ZombieGame/Components/`.
+- Added `AZombiePlayerCharacter` under `Source/ZombieGame/Characters/Player/` — top-down
+  orthographic camera, Enhanced Input (Move/Sprint/Interact/Pause) built entirely in C++, mouse
+  cursor deprojection for aim rotation.
+- Added `PublicIncludePaths.Add(ModuleDirectory)` to `ZombieGame.Build.cs` so module-root-relative
+  includes (e.g. `"Components/HealthComponent.h"`) work from any subfolder, instead of fragile
+  `../../` chains.
+- Wired `AZombiePlayerCharacter` as `DefaultPawnClass` on `AZombieGameMode`.
+- Verified clean build: `ZombieGameEditor` Win64 Development, `Result: Succeeded`, 0 errors.
+  **Milestone 2 complete.** `InventoryComponent`/`WeaponComponent` deferred to Milestone 3.
+
 ### Milestone 1 — Core Framework
 
 - Added `UZombieGameInstance`, `AZombieGameMode` (`AGameModeBase`), `AZombieGameState`
