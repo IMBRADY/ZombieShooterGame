@@ -5,6 +5,23 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Fix — "no character on Play" (GameMapsSettings ini section)
+
+- Root cause: `GameInstanceClass`/`GlobalDefaultGameMode` were under `[/Script/Engine.Engine]`
+  in `Config/DefaultEngine.ini` since Milestone 1 — wrong section (confirmed against
+  `BaseEngine.ini`), silently ignored, no error anywhere. Every build was actually running
+  vanilla `AGameModeBase`, so `DefaultPawnClass` never applied. Moved both keys (plus new
+  `EditorStartupMap`/`GameDefaultMap`) to `[/Script/EngineSettings.GameMapsSettings]`.
+- Added `Content/Maps/L_TestSector.umap` (Floor, PlayerStart, DirectionalLight, SkyLight) — the
+  project previously had no map at all, so the editor was opening an unrelated fallback
+  "Untitled" scene. Set as `EditorStartupMap`/`GameDefaultMap`.
+- Added a `BodyMesh` (`UStaticMeshComponent`, engine basic cylinder) to `AZombiePlayerCharacter`
+  as a temporary visible placeholder — the capsule had no visual representation at all before.
+- Verified with two independent runtime log checks (not just a successful compile):
+  `LogZombieGame: ZombieGameInstance initialized` and `LogLoad: Game class is 'ZombieGameMode'`
+  both now appear on launch. Also directly logged the live camera transform from `BeginPlay`,
+  confirming `Pitch=-90°` (true top-down) on the correctly-spawned `ZombiePlayerCharacter` pawn.
+
 ### Fix — fatal error loading the uproject
 
 - `AZombiePlayerCharacter`'s constructor built Enhanced Input modifiers with `NewObject<>()`

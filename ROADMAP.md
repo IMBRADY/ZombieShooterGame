@@ -72,13 +72,18 @@ fundamentally about holding/firing weapons, and no weapon type exists yet. Build
 would mean either empty shells or loosely-typed placeholders that get reworked anyway; better to
 build them together with `BaseWeapon`/`Hitscan`/`Projectile`.
 
-No visual representation yet (no sprite/flipbook, no mesh) — `ACharacter`'s default mesh slot is
-unset, so the capsule is invisible. That's a separate art-integration pass (Paper2D or billboard
-setup), not part of this milestone's mechanical scope, and there's no level to test in yet
-either. **Still can't "press Play and see something"** after this milestone — that needs at
-minimum a test level with a floor + PlayerStart, which was intentionally skipped earlier.
-
 **Milestone 2 complete.**
+
+**Update (post-Milestone-2 fix pass):** pressing Play now actually shows something. This
+required fixing a real bug (not part of Milestone 2's original scope, but blocking verification
+of it): `GameInstanceClass`/`GlobalDefaultGameMode` were in the wrong `DefaultEngine.ini` section
+since Milestone 1 (`[/Script/Engine.Engine]` instead of
+`[/Script/EngineSettings.GameMapsSettings]`), so the custom GameMode/GameInstance never actually
+applied — every "Play" was silently vanilla Unreal. Also added `Content/Maps/L_TestSector.umap`
+(the project had no map at all before this) and a temporary `BodyMesh` placeholder (engine basic
+cylinder) since the capsule had zero visual representation. See `CLAUDE.md` gotcha #3 for full
+detail and `CHANGELOG.md` for the fix entry. Real sprite/flipbook art still pending (§2 direction
+in ARCHITECTURE.md) — the cylinder is a greybox stand-in, not final.
 
 ## Milestone 3 — Weapons
 

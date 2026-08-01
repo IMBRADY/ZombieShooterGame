@@ -6,6 +6,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class UStaticMeshComponent;
 class UHealthComponent;
 class UStaminaComponent;
 class UDamageComponent;
@@ -33,6 +34,11 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> TopDownCamera;
+
+	// Greybox placeholder so the character is visible before real sprite/flipbook art exists
+	// (see ARCHITECTURE.md 2 for the intended 2.5D pixel-art-over-3D-environment direction).
+	UPROPERTY(VisibleAnywhere, Category = "Visual")
+	TObjectPtr<UStaticMeshComponent> BodyMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UHealthComponent> HealthComponent;

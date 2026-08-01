@@ -3,6 +3,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
@@ -37,6 +40,20 @@ AZombiePlayerCharacter::AZombiePlayerCharacter()
 	TopDownCamera->ProjectionMode = ECameraProjectionMode::Orthographic;
 	TopDownCamera->OrthoWidth = 2000.0f;
 	TopDownCamera->bUsePawnControlRotation = false;
+
+	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
+	BodyMesh->SetupAttachment(GetCapsuleComponent());
+	BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	BodyMesh->SetCastShadow(true);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaceholderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (PlaceholderMeshFinder.Succeeded())
+	{
+		BodyMesh->SetStaticMesh(PlaceholderMeshFinder.Object);
+		// Engine cylinder is 100x100x100 uniform; scale to roughly match the default capsule
+		// (radius 34, half-height 88) so the placeholder doesn't dwarf/vanish inside it.
+		BodyMesh->SetRelativeScale3D(FVector(0.6f, 0.6f, 1.76f));
+		BodyMesh->SetRelativeLocation(FVector::ZeroVector);
+	}
 
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 	StaminaComponent = CreateDefaultSubobject<UStaminaComponent>(TEXT("StaminaComponent"));
