@@ -5,6 +5,15 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Milestone 1 — Core Framework
+
+- Added `UZombieGameInstance`, `AZombieGameMode` (`AGameModeBase`), `AZombieGameState`
+  (`AGameStateBase`), `AZombiePlayerState` under `Source/ZombieGame/Core/`.
+- Added `LogZombieGame` log category to the `ZombieGame` module.
+- Wired `GameInstanceClass`/`GlobalDefaultGameMode` via new `Config/DefaultEngine.ini`.
+- Verified clean build: `ZombieGameEditor` Win64 Development, `Result: Succeeded`, 0 errors.
+  **Milestone 1 complete.**
+
 ### Milestone 0 — Project Scaffold
 
 - Pivoted engine from Godot 4.7.1/C# to Unreal Engine 5.8/C++ per updated project spec.

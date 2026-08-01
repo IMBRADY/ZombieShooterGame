@@ -20,8 +20,26 @@ Goal: an empty, cleanly-buildable UE 5.8 C++ project matching the structure in
 
 ## Milestone 1 — Core Framework
 
-Not started. Planned scope: `GameInstance`, `GameMode`, `GameState`, `PlayerState` skeletons per
-`ARCHITECTURE.md` §3, wired together but not yet doing gameplay.
+- [x] `UZombieGameInstance` (`UGameInstance`) — bare skeleton + `LogZombieGame` category, logs on
+      `Init()`. Save/Settings/Steam responsibilities land in their own later milestones.
+- [x] `AZombieGameMode` (`AGameModeBase` — not the full match-state `AGameMode`; this game has no
+      lobby/ready-up/spectator flow, so the simpler base avoids unused machinery). Wires
+      `GameStateClass`/`PlayerStateClass`. Owns `AdvanceToNextSector()` (real, working: bumps
+      `CurrentSector` and a simple linear `DifficultyLevel` — the real difficulty-curve Data
+      Asset from `ARCHITECTURE.md` §8 is still future work, tracked under "Later" below).
+- [x] `AZombieGameState` (`AGameStateBase`) — replicated `CurrentSector`, `DifficultyLevel`,
+      `SpawnBudget`, `RemainingEnemies`, `ActiveZombies`. `OnSectorChanged` delegate for future
+      HUD sector-number display.
+- [x] `AZombiePlayerState` (`APlayerState`) — replicated `Money`, `Kills`, `BossesDefeated`,
+      `DamageTaken`; `AddMoney`/`SpendMoney` (guarded, real logic) with `OnMoneyChanged` delegate
+      for future HUD. **Perks and inventory references deliberately deferred** — spec lists them
+      on PlayerState, but the Perk Data Asset system and InventoryComponent don't exist yet
+      (Perks/Player milestones); adding placeholder fields now would just mean reworking them
+      later for no benefit.
+- [x] Wired via `Config/DefaultEngine.ini` (`GameInstanceClass`, `GlobalDefaultGameMode`).
+- [x] Clean build verified (`ZombieGameEditor`, Win64 Development, `Result: Succeeded`, 0 errors).
+
+**Milestone 1 complete.**
 
 ## Milestone 2 — Player
 
