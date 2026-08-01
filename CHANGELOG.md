@@ -5,6 +5,50 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Milestone 3 follow-up — shared chase pathing, and the reason zombies stood still
+
+User report: "zombies spawn but they don't try to chase and kill the player". Two things, one a
+requested design change and one a real bug.
+
+**Chasing now uses one shared flow field** (`Source/ZombieGame/AI/ZombieFlowFieldSubsystem.cpp`),
+per the user's direction to compute pathing as a radius outward from the player so every zombie
+reads the same data instead of solving its own path.
+
+- `FSectorNavigationGrid` — sector walkability, built from the room layout (which is already an
+  exact tile map of the spawned geometry) rather than queried back out of the navmesh.
+- `UZombieFlowFieldSubsystem` — floods that grid outward from **every player pawn at once**,
+  recording each cell's distance to the nearest player, and derives a downhill direction per cell
+  from the local gradient (so movement is diagonal, not staircased). One flood per rebuild
+  interval serves the entire horde, so cost no longer scales with zombie count. Multi-source
+  seeding means a second player needs no changes.
+- `UBTTask_ZombieChaseTarget` replaces the per-zombie `MoveTo` in the combat branch, falling back
+  to direct steering when the field cannot answer. Roaming and investigating still use ordinary
+  navigation queries — they go to arbitrary points and happen rarely.
+- RVO avoidance on zombies, so a horde descending one shared field spreads across the corridor
+  instead of stacking into a column.
+- `UZombieAISettings` Data Asset — roam radius, idle pacing, field rebuild interval, and a switch
+  to A/B the field against per-zombie pathing.
+
+**Idle behaviour retuned** to the requested shape: shorter wander hops (800uu) with a short pause
+after each, so zombies that have not seen anything mill around their patch instead of trekking.
+
+**Fix — zombies spawned and then never moved at all.** A `RecastNavMesh` actor had been saved into
+`L_TestSector`. The level is empty at edit time (every room is spawned at runtime), so the baked
+navmesh was empty, and its serialized settings overrode the `RuntimeGeneration=Dynamic` project
+default — config defaults only apply to freshly created instances. Every navigation query failed,
+so the roam branch failed instantly and the Behavior Tree spun with no active task. Navigation
+data is no longer saved into the level; `bAutoCreateNavigationData` recreates it at runtime.
+
+**Fix — `SetAvoidanceEnabled` called from a constructor.** It needs a character owner and a world
+to register with the avoidance manager and has neither during construction, leaving avoidance
+flagged on but unregistered. Moved to `BeginPlay`.
+
+**Tuning** — zombie sight radii raised (Common 1400 → 2600) so a zombie notices the player from
+across the room it is standing in rather than only at close range.
+
+Verified headlessly: 29 zombies, 21 moving, 6 holding targets, closing from 1431uu to 158uu, player
+100 → 64 → 4 HP.
+
 ### Milestone 3 — Sector Generation, Zombies & AI
 
 Rooms, enemies and the Spawn Director. First build in which a sector actually plays: the level is

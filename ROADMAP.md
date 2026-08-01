@@ -126,11 +126,23 @@ there was nothing to shoot at and nothing to verify a weapon against.
 - [x] Sector completion condition: budget spent **and** all zombies dead.
 - [x] `AZombieGameMode` sequences generation → encounter → rewards → next sector.
 
+### Chase pathing (follow-up pass)
+
+- [x] `FSectorNavigationGrid` — sector walkability derived from the room layout.
+- [x] `UZombieFlowFieldSubsystem` — one distance field flooded outward from the players, shared by
+      the whole horde, so chase pathing cost stops scaling with zombie count. Multi-source, so it
+      is multiplayer-ready by construction. See ARCHITECTURE.md §6.2.
+- [x] `UBTTask_ZombieChaseTarget` — reads the field; falls back to direct steering when it cannot
+      answer. Roaming/investigating deliberately still use ordinary navigation queries.
+- [x] RVO avoidance so a shared-field horde spreads out rather than stacking.
+- [x] `UZombieAISettings` Data Asset for roam/idle pacing and field rebuild interval.
+
 ### Verification
 
 - [x] Clean build (`ZombieGameEditor`, Win64 Development, `Result: Succeeded`, 0 errors).
-- [x] Runtime-verified headlessly: 7-room sector, 16 spawn points, budget 60 → 56 queued zombies,
-      tree assembled, zombies roamed, acquired the player, and killed them (100 → 64 → 0 HP).
+- [x] Runtime-verified headlessly: 7-room sector, 17 spawn points, budget 60 → 56 queued zombies,
+      tree assembled. Zombies roam and idle when nothing is seen, acquire the player, close from
+      1431uu to 158uu, and kill them (100 → 64 → 4 → 0 HP).
 
 **Milestone 3 complete.**
 

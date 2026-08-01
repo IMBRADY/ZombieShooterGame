@@ -1,7 +1,9 @@
 #include "SectorGeneratorComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerStart.h"
+#include "AI/ZombieFlowFieldSubsystem.h"
 #include "Rooms/Procedural/SectorGenerationSettings.h"
+#include "Rooms/Procedural/SectorNavigationGrid.h"
 #include "Rooms/Procedural/SectorLayoutBuilder.h"
 #include "Rooms/RoomModule.h"
 #include "Rooms/RoomTemplates/RoomTemplateDataAsset.h"
@@ -153,6 +155,15 @@ bool USectorGeneratorComponent::GenerateSector(int32 Sector, int32 Seed)
 
 	GeneratedPlayerStart = World->SpawnActor<APlayerStart>(APlayerStart::StaticClass(), PlayerStartLocation, FRotator::ZeroRotator, SpawnParams);
 
+	// Hand the horde its shared pathing data. Built from the layout rather than read back out of
+	// the navmesh: the layout is already an exact tile map of what was just spawned.
+	if (UZombieFlowFieldSubsystem* FlowField = World->GetSubsystem<UZombieFlowFieldSubsystem>())
+	{
+		FSectorNavigationGrid NavigationGrid;
+		NavigationGrid.BuildFromLayout(Layout, Settings->TileSize);
+		FlowField->SetSectorGrid(NavigationGrid);
+	}
+
 	UE_LOG(LogZombieGame, Log, TEXT("Sector %d generated: %d rooms, %d zombie spawn points, bounds %s."),
 		Sector, SpawnedRooms.Num(), ZombieSpawnLocations.Num(), *SectorBounds.ToString());
 
@@ -178,6 +189,14 @@ void USectorGeneratorComponent::ClearSector()
 	ZombieSpawnLocations.Reset();
 	SectorBounds = FBox(ForceInit);
 	ExitRoomIndex = INDEX_NONE;
+
+	if (UWorld* World = GetWorld())
+	{
+		if (UZombieFlowFieldSubsystem* FlowField = World->GetSubsystem<UZombieFlowFieldSubsystem>())
+		{
+			FlowField->ClearSectorGrid();
+		}
+	}
 
 	if (IsValid(GeneratedPlayerStart))
 	{

@@ -71,6 +71,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Zombie", meta = (ClampMin = "0.0"))
 	float CorpseLifetime = 4.0f;
 
+	/** RVO avoidance, so a horde following one shared flow field spreads out instead of stacking. */
+	UPROPERTY(EditDefaultsOnly, Category = "Zombie")
+	bool bUseLocalAvoidance = true;
+
 private:
 	UFUNCTION()
 	void HandleDeath();

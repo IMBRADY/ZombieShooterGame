@@ -175,11 +175,13 @@ ZOMBIES = [
         "attack_range": 130.0,
         "move_speed": 170.0,
         "money_reward": 10,
-        "sight_radius": 1400.0,
-        "lose_sight_radius": 1900.0,
-        "peripheral_vision_half_angle": 80.0,
-        "hearing_range": 3000.0,
-        "memory_seconds": 6.0,
+        # Sight has to reach across a large combat room (13 tiles / ~3250uu) or zombies never
+        # notice the player from the far side of the room they are standing in.
+        "sight_radius": 2600.0,
+        "lose_sight_radius": 3400.0,
+        "peripheral_vision_half_angle": 85.0,
+        "hearing_range": 3500.0,
+        "memory_seconds": 8.0,
         "body_scale": 1.0,
         "debug_tint": unreal.LinearColor(0.13, 0.40, 0.16, 1.0),
     }),
@@ -196,11 +198,11 @@ ZOMBIES = [
         "attack_range": 120.0,
         "move_speed": 430.0,
         "money_reward": 18,
-        "sight_radius": 1800.0,
-        "lose_sight_radius": 2400.0,
+        "sight_radius": 3200.0,
+        "lose_sight_radius": 4000.0,
         "peripheral_vision_half_angle": 90.0,
-        "hearing_range": 3500.0,
-        "memory_seconds": 8.0,
+        "hearing_range": 4000.0,
+        "memory_seconds": 10.0,
         "body_scale": 0.85,
         "debug_tint": unreal.LinearColor(0.75, 0.72, 0.10, 1.0),
     }),
@@ -217,11 +219,11 @@ ZOMBIES = [
         "attack_range": 190.0,
         "move_speed": 120.0,
         "money_reward": 60,
-        "sight_radius": 1200.0,
-        "lose_sight_radius": 1600.0,
-        "peripheral_vision_half_angle": 70.0,
-        "hearing_range": 2600.0,
-        "memory_seconds": 10.0,
+        "sight_radius": 2200.0,
+        "lose_sight_radius": 3000.0,
+        "peripheral_vision_half_angle": 75.0,
+        "hearing_range": 3000.0,
+        "memory_seconds": 12.0,
         "body_scale": 1.55,
         "debug_tint": unreal.LinearColor(0.45, 0.09, 0.09, 1.0),
     }),
@@ -249,6 +251,19 @@ if director:
     save(director)
     note("DA_SpawnDirector ({0})".format("created" if created else "updated"))
 
+ai_settings, created = get_or_create("DA_ZombieAI", ZOMBIE_DIR, unreal.ZombieAISettings)
+if ai_settings:
+    apply(ai_settings, {
+        "roam_radius": 800.0,
+        "idle_time": 1.5,
+        "idle_time_deviation": 1.0,
+        "investigate_look_around_time": 1.5,
+        "flow_field_rebuild_interval": 0.25,
+        "use_flow_field_for_chase": True,
+    })
+    save(ai_settings)
+    note("DA_ZombieAI ({0})".format("created" if created else "updated"))
+
 # ------------------------------------------------------------------- test level
 level_subsystem = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -274,6 +289,16 @@ if not has_nav_bounds:
         note("FAILED to spawn NavMeshBoundsVolume")
 else:
     note("NavMeshBoundsVolume already present")
+
+# A RecastNavMesh must NOT be saved into this level. The level is empty at edit time - every room
+# is spawned at runtime - so anything baked here is an empty navmesh carrying its serialized
+# settings and tile data, and it wins over the Dynamic default in DefaultEngine.ini. The symptom is
+# that zombies spawn and then stand still forever, because every navigation query fails.
+# bAutoCreateNavigationData recreates it correctly at runtime once the nav bounds are seen.
+for actor in actor_subsystem.get_all_level_actors():
+    if isinstance(actor, unreal.NavigationData):
+        note("removing baked navigation data from the level: " + actor.get_actor_label())
+        actor_subsystem.destroy_actor(actor)
 
 level_subsystem.save_current_level()
 note("saved level " + MAP_PATH)

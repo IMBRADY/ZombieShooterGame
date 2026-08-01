@@ -25,6 +25,13 @@ AZombieCharacter::AZombieCharacter()
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->bUseControllerDesiredRotation = false;
 
+	// Avoidance tuning only - it is switched on in BeginPlay, not here. SetAvoidanceEnabled needs a
+	// character owner and a world to register with the avoidance manager, and has neither during
+	// construction; calling it here leaves avoidance flagged on but unregistered, which stops the
+	// pawn moving at all.
+	GetCharacterMovement()->AvoidanceConsiderationRadius = 220.0f;
+	GetCharacterMovement()->AvoidanceWeight = 0.5f;
+
 	GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
 
 	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
@@ -48,6 +55,13 @@ void AZombieCharacter::BeginPlay()
 	if (HealthComponent)
 	{
 		HealthComponent->OnDeath.AddDynamic(this, &AZombieCharacter::HandleDeath);
+	}
+
+	// Every chasing zombie descends the same shared flow field, so without local avoidance a horde
+	// converges into one overlapping column instead of spreading across the corridor.
+	if (bUseLocalAvoidance)
+	{
+		GetCharacterMovement()->SetAvoidanceEnabled(true);
 	}
 
 	ApplyArchetypeVisuals();

@@ -1,8 +1,10 @@
 #include "ZombieAIAssetSubsystem.h"
 #include "AI/Blackboard/ZombieBlackboardKeys.h"
+#include "AI/ZombieAISettings.h"
 #include "AI/Decorators/BTDecorator_ZombieBlackboardKeySet.h"
 #include "AI/Services/BTService_ZombieCombatState.h"
 #include "AI/Tasks/BTTask_ZombieAttack.h"
+#include "AI/Tasks/BTTask_ZombieChaseTarget.h"
 #include "AI/Tasks/BTTask_ZombieClearBlackboardValue.h"
 #include "AI/Tasks/BTTask_ZombieFindRoamLocation.h"
 #include "AI/Tasks/BTTask_ZombieMoveTo.h"
@@ -95,8 +97,11 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildCombatBranch(UBehaviorTree& Tree
 	AttachTask(*Combat, Attack,
 		MakeKeySetDecorator(Tree, TEXT("Dec_InAttackRange"), ZombieBlackboardKeys::InAttackRange, EBTFlowAbortMode::Both));
 
-	UBTTask_ZombieMoveTo* Chase = NewObject<UBTTask_ZombieMoveTo>(&Tree, UBTTask_ZombieMoveTo::StaticClass(), TEXT("Task_Chase"));
-	Chase->Configure(ZombieBlackboardKeys::TargetActor, /*AcceptableRadius=*/80.0f, /*bChaseMovingGoal=*/true);
+	// Chasing goes through the horde's shared flow field rather than a per-zombie MoveTo - see
+	// UZombieFlowFieldSubsystem for why. Investigating and roaming still use real navigation
+	// queries: those are one-off, infrequent, and go somewhere the field knows nothing about.
+	UBTTask_ZombieChaseTarget* Chase = NewObject<UBTTask_ZombieChaseTarget>(&Tree, UBTTask_ZombieChaseTarget::StaticClass(), TEXT("Task_Chase"));
+	Chase->Configure(ZombieBlackboardKeys::TargetActor);
 	AttachTask(*Combat, Chase);
 
 	return Combat;
@@ -104,6 +109,8 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildCombatBranch(UBehaviorTree& Tree
 
 UBTCompositeNode* UZombieAIAssetSubsystem::BuildInvestigateBranch(UBehaviorTree& Tree) const
 {
+	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
+
 	UBTComposite_Sequence* Investigate = NewObject<UBTComposite_Sequence>(&Tree, UBTComposite_Sequence::StaticClass(), TEXT("Seq_Investigate"));
 	Investigate->NodeName = TEXT("Investigate Noise");
 
@@ -111,7 +118,7 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildInvestigateBranch(UBehaviorTree&
 	MoveToNoise->Configure(ZombieBlackboardKeys::InvestigateLocation, /*AcceptableRadius=*/100.0f, /*bChaseMovingGoal=*/false);
 	AttachTask(*Investigate, MoveToNoise);
 
-	AttachTask(*Investigate, MakeWaitTask(Tree, TEXT("Task_LookAround"), 1.5f, 0.5f));
+	AttachTask(*Investigate, MakeWaitTask(Tree, TEXT("Task_LookAround"), Settings->InvestigateLookAroundTime, 0.5f));
 
 	UBTTask_ZombieClearBlackboardValue* Forget =
 		NewObject<UBTTask_ZombieClearBlackboardValue>(&Tree, UBTTask_ZombieClearBlackboardValue::StaticClass(), TEXT("Task_ForgetNoise"));
@@ -123,20 +130,24 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildInvestigateBranch(UBehaviorTree&
 
 UBTCompositeNode* UZombieAIAssetSubsystem::BuildRoamBranch(UBehaviorTree& Tree) const
 {
+	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
+
 	UBTComposite_Sequence* Roam = NewObject<UBTComposite_Sequence>(&Tree, UBTComposite_Sequence::StaticClass(), TEXT("Seq_Roam"));
 	Roam->NodeName = TEXT("Roam");
 
+	// Short hops with a short pause after each, rather than long treks: a zombie that has not seen
+	// anything should read as milling around its patch, and it keeps them spread through the rooms
+	// they were spawned in instead of draining toward one corner of the sector.
 	UBTTask_ZombieFindRoamLocation* FindRoamLocation =
 		NewObject<UBTTask_ZombieFindRoamLocation>(&Tree, UBTTask_ZombieFindRoamLocation::StaticClass(), TEXT("Task_FindRoamLocation"));
-	FindRoamLocation->Configure(ZombieBlackboardKeys::RoamLocation, /*RoamRadius=*/1200.0f);
+	FindRoamLocation->Configure(ZombieBlackboardKeys::RoamLocation, Settings->RoamRadius);
 	AttachTask(*Roam, FindRoamLocation);
 
 	UBTTask_ZombieMoveTo* MoveToRoamLocation = NewObject<UBTTask_ZombieMoveTo>(&Tree, UBTTask_ZombieMoveTo::StaticClass(), TEXT("Task_Wander"));
 	MoveToRoamLocation->Configure(ZombieBlackboardKeys::RoamLocation, /*AcceptableRadius=*/60.0f, /*bChaseMovingGoal=*/false);
 	AttachTask(*Roam, MoveToRoamLocation);
 
-	// Idle beat between wanders, so a quiet sector doesn't look like a conveyor belt.
-	AttachTask(*Roam, MakeWaitTask(Tree, TEXT("Task_Idle"), 2.5f, 1.5f));
+	AttachTask(*Roam, MakeWaitTask(Tree, TEXT("Task_Idle"), Settings->IdleTime, Settings->IdleTimeDeviation));
 
 	return Roam;
 }
