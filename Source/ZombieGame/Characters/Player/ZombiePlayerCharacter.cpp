@@ -29,7 +29,7 @@ AZombiePlayerCharacter::AZombiePlayerCharacter()
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 1200.0f;
-	CameraBoom->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
+	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, 0.0f, 0.0f));
 	CameraBoom->bDoCollisionTest = false;
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = false;

@@ -5,6 +5,12 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Tweak — angled top-down camera
+
+- `AZombiePlayerCharacter` camera pitch is now a tunable `EditDefaultsOnly` property
+  (`CameraPitch`, default -75°) instead of a hardcoded -90°, per user request for a slightly
+  angled top-down look rather than a flat straight-down shot.
+
 ### Fix — "no character on Play" (GameMapsSettings ini section)
 
 - Root cause: `GameInstanceClass`/`GlobalDefaultGameMode` were under `[/Script/Engine.Engine]`

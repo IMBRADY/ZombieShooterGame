@@ -35,6 +35,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> TopDownCamera;
 
+	// -90 = looking straight down. Kept off -90 for a slight angled top-down look (readable
+	// silhouettes/depth) rather than a flat orthographic-feeling top-down.
+	UPROPERTY(EditDefaultsOnly, Category = "Camera", meta = (ClampMin = "-90.0", ClampMax = "0.0"))
+	float CameraPitch = -75.0f;
+
 	// Greybox placeholder so the character is visible before real sprite/flipbook art exists
 	// (see ARCHITECTURE.md 2 for the intended 2.5D pixel-art-over-3D-environment direction).
 	UPROPERTY(VisibleAnywhere, Category = "Visual")

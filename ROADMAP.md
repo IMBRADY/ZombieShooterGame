@@ -85,6 +85,10 @@ cylinder) since the capsule had zero visual representation. See `CLAUDE.md` gotc
 detail and `CHANGELOG.md` for the fix entry. Real sprite/flipbook art still pending (§2 direction
 in ARCHITECTURE.md) — the cylinder is a greybox stand-in, not final.
 
+Camera pitch adjusted from a flat -90° (straight down) to a tunable -75° default
+(`CameraPitch` property) per user request — slightly angled top-down rather than pure
+orthographic-from-above.
+
 ## Milestone 3 — Weapons
 
 Not started. Planned scope: `BaseWeapon` + Hitscan/Projectile split, Weapon Data Asset pipeline,
