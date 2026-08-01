@@ -5,6 +5,75 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Milestone 3 — Sector Generation, Zombies & AI
+
+Rooms, enemies and the Spawn Director. First build in which a sector actually plays: the level is
+assembled from handcrafted modules, zombies spawn on a budget, hunt the player, and kill them.
+
+**Room generation** (`Source/ZombieGame/Rooms/`)
+
+- `FRoomGrid` — parses a handcrafted tile layout (`#` wall, `.` floor, `D` doorway, `O` obstacle,
+  `S` zombie spawn, `P` player start, ` ` outside) into tiles, doorways and spawn cells; validates
+  that doorways sit on module edges and that no walkable pocket is sealed off. Supports rotation.
+- `FSectorLayoutBuilder` — seeded assembly of modules into a sector: picks a start room, attaches
+  weighted modules to open doorways in any rotation, rejects overlapping footprints, and validates
+  the result independently (all rooms reachable from the start, a reachable exit room, no
+  overlaps). Plain C++, no UObject/world/asset dependency, so ARCHITECTURE.md §17's room-graph
+  tests can run without loading a level.
+- `URoomTemplateDataAsset` — a handcrafted module as content. New room = new Data Asset.
+- `ARoomModule` — realises a module as Instanced Static Mesh geometry; unconnected doorways are
+  sealed back into wall so a sector never opens onto the void.
+- `USectorGeneratorComponent` + `USectorGenerationSettings` — runs the builder, spawns modules,
+  places the `APlayerStart` in the generated start room, and collects zombie spawn points.
+
+**Zombies** (`Source/ZombieGame/Characters/Zombies/`)
+
+- `UZombieArchetypeDataAsset` — stats, spawn economy (tier/cost/weight/min sector), perception
+  ranges, and an optional Behavior Tree override, all as content.
+- `AZombieCharacter` — Health/Damage components, archetype-driven stats applied before BeginPlay
+  via deferred spawn, melee through Unreal's standard damage path, death → reward + corpse cleanup.
+- Content: `DA_Zombie_Common` (cost 1), `DA_Zombie_Runner` (cost 2), `DA_Zombie_Tank` (cost 8,
+  unlocks sector 2) — costs follow the design brief's worked example.
+
+**Zombie AI** (`Source/ZombieGame/AI/`)
+
+- `AZombieAIController` — AI Perception (sight + hearing, archetype-configured), translating
+  stimuli into Blackboard state and nothing more; all decisions live in the tree.
+- `UZombieAIAssetSubsystem` — assembles the shared Blackboard and Behavior Tree in C++ (see
+  ARCHITECTURE.md §6 for why, and for the editor-authored override seam).
+- BT nodes: `UBTService_ZombieCombatState`, `UBTTask_ZombieAttack`,
+  `UBTTask_ZombieFindRoamLocation`, `UBTTask_ZombieMoveTo`, `UBTTask_ZombieClearBlackboardValue`,
+  `UBTDecorator_ZombieBlackboardKeySet`. Behaviour priority: chase/attack a seen target →
+  investigate a heard noise → roam.
+
+**Spawn Director** (`Source/ZombieGame/Core/`)
+
+- `USpawnDirectorComponent` + `USpawnDirectorSettings` — difficulty budget → zombie cost table →
+  weighted selection → spawn queue, drained on a timer with a concurrency cap and a minimum spawn
+  distance from the player. Sector clears when the budget is spent *and* nothing is left alive.
+- `AZombieGameMode` — sequences level generation and encounter start, pays out money/kills to
+  `AZombiePlayerState`, and advances sectors.
+
+**Supporting changes**
+
+- `FZombiePrimaryAssetLoader` + `Config/DefaultGame.ini` Asset Manager scan rules: room templates
+  and zombie archetypes are discovered by type, so new content needs no registration step.
+- `UHealthComponent::SetMaxHealth`, `UDamageComponent::GetLastDamageInstigator` (kill credit).
+- `Config/DefaultEngine.ini`: runtime-dynamic Recast navmesh, since rooms are spawned at runtime.
+- `L_TestSector`: legacy greybox floor plane removed (modules bring their own floors), navmesh
+  bounds volume added.
+- Verified at runtime headlessly: sector assembled from 7 modules with 16 spawn points, budget 60
+  spent on 56 zombies, tree assembled, zombies roamed, acquired the player and took them from
+  100 HP to 0.
+
+### Fix — room floors were visible but not solid
+
+- Room geometry ISM components were `Static` mobility. Static mobility means "final at level
+  load"; these components are created at runtime, and instances added to a registered static ISM
+  get half-built collision — some rooms' floors blocked, others silently did not, and pawns
+  spawned in those rooms fell through the world forever. Now `Movable`, and room actors are spawned
+  deferred so their geometry exists before component registration.
+
 ### Tweak — angled top-down camera
 
 - `AZombiePlayerCharacter` camera pitch is now a tunable `EditDefaultsOnly` property

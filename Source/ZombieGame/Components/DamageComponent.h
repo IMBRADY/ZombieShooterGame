@@ -19,12 +19,21 @@ class ZOMBIEGAME_API UDamageComponent : public UActorComponent
 public:
 	UDamageComponent();
 
+	/**
+	 * Controller responsible for the most recent damage this actor took, or null if it was not
+	 * attributable (world damage, environmental hazards). Kill credit - money, kill count, and
+	 * later "favourite weapon" statistics - is resolved from this rather than assuming one player.
+	 */
+	AController* GetLastDamageInstigator() const { return LastDamageInstigator.Get(); }
+
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY()
 	TObjectPtr<UHealthComponent> CachedHealthComponent;
+
+	TWeakObjectPtr<AController> LastDamageInstigator;
 
 	UFUNCTION()
 	void HandleTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);

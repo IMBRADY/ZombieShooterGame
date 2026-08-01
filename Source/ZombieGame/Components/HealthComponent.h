@@ -26,6 +26,11 @@ public:
 
 	// Armor absorbs first, then health. Returns the amount actually applied to health.
 	float ApplyDamage(float DamageAmount);
+
+	// Re-sizes the pool - enemy health scales per sector, and perks raise the player's. bRefill is
+	// for the spawn case (start at full); leave it clear to raise the ceiling without healing.
+	void SetMaxHealth(float NewMaxHealth, bool bRefill);
+
 	void AddArmor(float Amount);
 	void Heal(float Amount);
 

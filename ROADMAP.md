@@ -89,18 +89,66 @@ Camera pitch adjusted from a flat -90° (straight down) to a tunable -75° defau
 (`CameraPitch` property) per user request — slightly angled top-down rather than pure
 orthographic-from-above.
 
-## Milestone 3 — Weapons
+## Milestone 3 — Sector Generation, Zombies & AI
+
+Brought forward ahead of Weapons at the user's request: the game had no rooms and no enemies, so
+there was nothing to shoot at and nothing to verify a weapon against.
+
+### Room generation
+
+- [x] `FRoomGrid` — handcrafted tile-layout parser + validator (doorways on module edges, no
+      sealed-off walkable pockets), with rotation support.
+- [x] `FSectorLayoutBuilder` — seeded module assembly with overlap rejection, plus independent
+      validation of the design's generation rules (all rooms connected, reachable exit, no
+      overlapping geometry). Plain C++, no engine dependency — testable per ARCHITECTURE.md §17.
+- [x] `URoomTemplateDataAsset` — a handcrafted module as content; new room = new Data Asset.
+- [x] `ARoomModule` — ISM geometry from a tile grid; unconnected doorways sealed back to wall.
+- [x] `USectorGeneratorComponent` + `USectorGenerationSettings` — spawns the sector, places the
+      generated `APlayerStart`, collects zombie spawn points.
+- [x] Content: 9 room modules (start, 3 combat, 3 hallway/corner, dead end, treasure).
+
+### Zombies & AI
+
+- [x] `UZombieArchetypeDataAsset` — stats, spawn economy, perception ranges, optional BT override.
+- [x] `AZombieCharacter` — component-composed, archetype-driven, damage through Unreal's standard
+      path, death → reward + corpse cleanup.
+- [x] `AZombieAIController` — AI Perception (sight + hearing) writing Blackboard state only.
+- [x] `UZombieAIAssetSubsystem` — shared Blackboard + Behavior Tree assembled in C++
+      (ARCHITECTURE.md §6 covers the rationale and the editor-authored override seam).
+- [x] BT nodes for attack, roam-point selection, move-to, key clearing, combat-state service and a
+      key-is-set decorator. Priority: chase/attack → investigate noise → roam.
+- [x] Content: Common / Runner / Tank archetypes (costs 1 / 2 / 8, per the design brief).
+
+### Spawn Director
+
+- [x] `USpawnDirectorComponent` + `USpawnDirectorSettings` — budget → cost table → weighted
+      selection → spawn queue, timer-driven with a concurrency cap and minimum spawn distance.
+- [x] Sector completion condition: budget spent **and** all zombies dead.
+- [x] `AZombieGameMode` sequences generation → encounter → rewards → next sector.
+
+### Verification
+
+- [x] Clean build (`ZombieGameEditor`, Win64 Development, `Result: Succeeded`, 0 errors).
+- [x] Runtime-verified headlessly: 7-room sector, 16 spawn points, budget 60 → 56 queued zombies,
+      tree assembled, zombies roamed, acquired the player, and killed them (100 → 64 → 0 HP).
+
+**Milestone 3 complete.**
+
+**Deliberately out of scope here:** Lobber/Exploder/Poison/Armored/Necromancer archetypes (they
+need projectiles and status effects, i.e. the Weapons milestone), bosses, and the exit door / shop
+hand-off. Until the shop exists, a cleared sector auto-advances after a delay
+(`AZombieGameMode::bAutoAdvanceOnSectorCleared`).
+
+## Milestone 4 — Weapons
 
 Not started. Planned scope: `BaseWeapon` + Hitscan/Projectile split, Weapon Data Asset pipeline,
-ammo, reload.
-
-## Milestone 4 — Enemies & AI
-
-Not started. Planned scope: zombie base Behavior Tree/Blackboard/Perception setup, Common
-archetype, then Runner/Tank/Lobber.
+ammo, reload, `InventoryComponent`/`WeaponComponent` (deferred since Milestone 2). Gunshots should
+call `UAISense_Hearing::ReportNoiseEvent` — the zombie investigate branch is already built and
+waiting for it.
 
 ## Later (not yet scoped in detail)
 
-Spawn Director, Room Generation/streaming, Shop/Economy, Perks, Loot, Boss system, UI/HUD,
-Audio (MetaSounds), Save System (mid-run + meta), Steam readiness (OnlineSubsystem),
-Automation Test suite, performance pass (pooling, Niagara, async loading, ISM).
+Player death/run-end flow, Shop/Economy, Perks, Loot, Boss system, remaining zombie archetypes,
+UI/HUD, Audio (MetaSounds), Save System (mid-run + meta), level streaming for room modules, Steam
+readiness (OnlineSubsystem), Automation Test suite, performance pass (pooling, Niagara, async
+loading).

@@ -19,6 +19,8 @@ public class ZombieGame : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"AIModule",
+			"NavigationSystem",
+			"GameplayTasks",
 			"GameplayTags",
 			"UMG",
 			"Niagara"

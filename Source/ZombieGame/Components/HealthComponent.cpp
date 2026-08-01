@@ -57,6 +57,21 @@ float UHealthComponent::ApplyDamage(float DamageAmount)
 	return RemainingDamage;
 }
 
+void UHealthComponent::SetMaxHealth(float NewMaxHealth, bool bRefill)
+{
+	MaxHealth = FMath::Max(NewMaxHealth, 1.0f);
+
+	const float OldHealth = Health;
+	Health = bRefill ? MaxHealth : FMath::Min(Health, MaxHealth);
+
+	if (Health > 0.0f)
+	{
+		bIsDead = false;
+	}
+
+	OnHealthChanged.Broadcast(Health, MaxHealth, Health - OldHealth);
+}
+
 void UHealthComponent::AddArmor(float Amount)
 {
 	if (Amount <= 0.0f)
