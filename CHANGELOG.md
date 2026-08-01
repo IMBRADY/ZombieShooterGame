@@ -5,6 +5,15 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Fix — fatal error loading the uproject
+
+- `AZombiePlayerCharacter`'s constructor built Enhanced Input modifiers with `NewObject<>()`
+  instead of `CreateDefaultSubobject<>()`, which compiles but fatals the engine on CDO
+  construction (i.e. the moment the project loads). Fixed by switching the four modifier
+  instances (`MoveNegateA`, `MoveSwizzleW`, `MoveSwizzleS`, `MoveNegateS`) to
+  `CreateDefaultSubobject`. Verified by rebuilding and launching `UnrealEditor.exe` headlessly —
+  log now reaches asset registry completion with no fatal/error lines.
+
 ### Milestone 2 — Player
 
 - Added `UHealthComponent`, `UStaminaComponent`, `UDamageComponent`, `IInteractable` +

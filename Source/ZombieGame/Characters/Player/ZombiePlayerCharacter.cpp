@@ -60,22 +60,25 @@ AZombiePlayerCharacter::AZombiePlayerCharacter()
 	// D: raw axis lands on X by default, which is exactly "right" here - no modifier needed.
 	DefaultMappingContext->MapKey(MoveAction, EKeys::D);
 	{
+		// Modifiers are UObjects created during CDO construction - must go through
+		// CreateDefaultSubobject (unique name required), not NewObject, or the engine fatals
+		// with "NewObject with empty name can't be used to create default subobjects".
 		FEnhancedActionKeyMapping& Mapping = DefaultMappingContext->MapKey(MoveAction, EKeys::A);
-		Mapping.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+		Mapping.Modifiers.Add(CreateDefaultSubobject<UInputModifierNegate>(TEXT("MoveNegateA")));
 	}
 	{
 		// W/S: swizzle the raw X output onto Y so they drive forward/back instead of left/right.
 		FEnhancedActionKeyMapping& Mapping = DefaultMappingContext->MapKey(MoveAction, EKeys::W);
-		UInputModifierSwizzleAxis* Swizzle = NewObject<UInputModifierSwizzleAxis>(this);
+		UInputModifierSwizzleAxis* Swizzle = CreateDefaultSubobject<UInputModifierSwizzleAxis>(TEXT("MoveSwizzleW"));
 		Swizzle->Order = EInputAxisSwizzle::YXZ;
 		Mapping.Modifiers.Add(Swizzle);
 	}
 	{
 		FEnhancedActionKeyMapping& Mapping = DefaultMappingContext->MapKey(MoveAction, EKeys::S);
-		UInputModifierSwizzleAxis* Swizzle = NewObject<UInputModifierSwizzleAxis>(this);
+		UInputModifierSwizzleAxis* Swizzle = CreateDefaultSubobject<UInputModifierSwizzleAxis>(TEXT("MoveSwizzleS"));
 		Swizzle->Order = EInputAxisSwizzle::YXZ;
 		Mapping.Modifiers.Add(Swizzle);
-		Mapping.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+		Mapping.Modifiers.Add(CreateDefaultSubobject<UInputModifierNegate>(TEXT("MoveNegateS")));
 	}
 
 	DefaultMappingContext->MapKey(SprintAction, EKeys::LeftShift);
