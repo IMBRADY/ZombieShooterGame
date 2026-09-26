@@ -1,0 +1,634 @@
+{
+ "sounds": [
+  {
+   "name": "SFX_Pistol_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Pistol_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pistol_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Pistol_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pistol_Fire_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Pistol_Fire_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Revolver_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Revolver_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Revolver_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Revolver_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Revolver_Fire_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Revolver_Fire_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_SMG_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_SMG_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_SMG_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_SMG_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_SMG_Fire_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_SMG_Fire_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Shotgun_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Shotgun_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Shotgun_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Shotgun_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Shotgun_Fire_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Shotgun_Fire_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Rifle_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Rifle_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Rifle_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Rifle_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Rifle_Fire_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Rifle_Fire_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Sniper_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Sniper_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Sniper_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Sniper_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Sniper_Fire_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Sniper_Fire_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Rocket_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Rocket_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Plasma_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Plasma_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Flame_Fire_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Flame_Fire_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Rocket_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Rocket_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Plasma_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Plasma_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Flame_Fire_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Flame_Fire_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Reload_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Reload_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Reload_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Reload_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Empty",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Empty.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Explosion_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Explosion_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Explosion_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Explosion_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Explosion_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Explosion_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Groan_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Groan_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Groan_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Groan_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Groan_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Groan_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Groan_3",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Groan_3.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Shriek_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Shriek_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Shriek_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Shriek_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Shriek_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Shriek_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Shriek_3",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Shriek_3.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Roar_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Roar_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Roar_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Roar_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Roar_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Roar_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Roar_3",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Roar_3.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Gurgle_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Gurgle_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Gurgle_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Gurgle_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Gurgle_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Gurgle_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Gurgle_3",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Gurgle_3.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Whisper_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Whisper_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Whisper_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Whisper_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Whisper_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Whisper_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Whisper_3",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Whisper_3.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Hurt_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Hurt_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Death_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Death_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Swipe_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Swipe_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Hurt_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Hurt_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Death_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Death_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Swipe_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Swipe_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Hurt_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Hurt_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Death_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Death_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Zombie_Swipe_2",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Zombie_Swipe_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Boss_Roar_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Boss_Roar_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Boss_Roar_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Boss_Roar_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Acid_Splash_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Acid_Splash_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Necro_Cast_0",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Necro_Cast_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Acid_Splash_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Acid_Splash_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Necro_Cast_1",
+   "folder": "Zombies",
+   "file": "SourceAssets\\Audio\\Zombies\\SFX_Necro_Cast_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Player_Hurt",
+   "folder": "Player",
+   "file": "SourceAssets\\Audio\\Player\\SFX_Player_Hurt.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Player_Death",
+   "folder": "Player",
+   "file": "SourceAssets\\Audio\\Player\\SFX_Player_Death.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Footstep",
+   "folder": "Player",
+   "file": "SourceAssets\\Audio\\Player\\SFX_Footstep.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Coin",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Coin.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Health",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Health.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Armor",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Armor.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Ammo",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Ammo.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Weapon",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Weapon.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Perk",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Perk.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Pickup_Key",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Audio\\Pickups\\SFX_Pickup_Key.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_UI_Click",
+   "folder": "UI",
+   "file": "SourceAssets\\Audio\\UI\\SFX_UI_Click.wav",
+   "loop": false,
+   "category": "UI"
+  },
+  {
+   "name": "SFX_UI_Buy",
+   "folder": "UI",
+   "file": "SourceAssets\\Audio\\UI\\SFX_UI_Buy.wav",
+   "loop": false,
+   "category": "UI"
+  },
+  {
+   "name": "SFX_UI_Denied",
+   "folder": "UI",
+   "file": "SourceAssets\\Audio\\UI\\SFX_UI_Denied.wav",
+   "loop": false,
+   "category": "UI"
+  },
+  {
+   "name": "SFX_Achievement",
+   "folder": "UI",
+   "file": "SourceAssets\\Audio\\UI\\SFX_Achievement.wav",
+   "loop": false,
+   "category": "UI"
+  },
+  {
+   "name": "SFX_Sector_Cleared",
+   "folder": "UI",
+   "file": "SourceAssets\\Audio\\UI\\SFX_Sector_Cleared.wav",
+   "loop": false,
+   "category": "UI"
+  },
+  {
+   "name": "SFX_Door_Unlock",
+   "folder": "World",
+   "file": "SourceAssets\\Audio\\World\\SFX_Door_Unlock.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Door_Open",
+   "folder": "World",
+   "file": "SourceAssets\\Audio\\World\\SFX_Door_Open.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Chest_Open",
+   "folder": "World",
+   "file": "SourceAssets\\Audio\\World\\SFX_Chest_Open.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "MUS_Sector_Explore",
+   "folder": "Music",
+   "file": "SourceAssets\\Audio\\Music\\MUS_Sector_Explore.wav",
+   "loop": true,
+   "category": "Music"
+  },
+  {
+   "name": "MUS_Sector_Combat",
+   "folder": "Music",
+   "file": "SourceAssets\\Audio\\Music\\MUS_Sector_Combat.wav",
+   "loop": true,
+   "category": "Music"
+  },
+  {
+   "name": "MUS_Menu",
+   "folder": "Music",
+   "file": "SourceAssets\\Audio\\Music\\MUS_Menu.wav",
+   "loop": true,
+   "category": "Music"
+  },
+  {
+   "name": "MUS_Boss",
+   "folder": "Music",
+   "file": "SourceAssets\\Audio\\Music\\MUS_Boss.wav",
+   "loop": true,
+   "category": "Music"
+  },
+  {
+   "name": "MUS_Intermission",
+   "folder": "Music",
+   "file": "SourceAssets\\Audio\\Music\\MUS_Intermission.wav",
+   "loop": true,
+   "category": "Music"
+  },
+  {
+   "name": "MUS_GameOver",
+   "folder": "Music",
+   "file": "SourceAssets\\Audio\\Music\\MUS_GameOver.wav",
+   "loop": true,
+   "category": "Music"
+  },
+  {
+   "name": "AMB_Machinery",
+   "folder": "Ambience",
+   "file": "SourceAssets\\Audio\\Ambience\\AMB_Machinery.wav",
+   "loop": true,
+   "category": "Effects"
+  }
+ ]
+}

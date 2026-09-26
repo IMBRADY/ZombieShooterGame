@@ -1,22 +1,37 @@
 #include "ZombiePlayerCharacter.h"
+#include "Audio/ZombieAudioSubsystem.h"
 #include "Camera/CameraComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "Components/StaticMeshComponent.h"
+#include "Characters/Player/ZombieInputConfig.h"
 #include "Components/CapsuleComponent.h"
-#include "UObject/ConstructorHelpers.h"
+#include "Components/DamageComponent.h"
+#include "Components/HealthComponent.h"
+#include "Components/InteractionComponent.h"
+#include "Components/InventoryComponent.h"
+#include "Components/ScreenShakeComponent.h"
+#include "Components/StaminaComponent.h"
+#include "Components/StatusEffectComponent.h"
+#include "Components/WeaponComponent.h"
+#include "Core/ZombieGameInstance.h"
+#include "Core/ZombieGameplayTags.h"
+#include "Core/ZombiePlayerState.h"
+#include "Core/ZombieStatSource.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "InputAction.h"
-#include "InputMappingContext.h"
-#include "InputModifiers.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
-#include "Kismet/GameplayStatics.h"
-#include "Components/HealthComponent.h"
-#include "Components/StaminaComponent.h"
-#include "Components/DamageComponent.h"
-#include "Components/InteractionComponent.h"
+#include "Visual/PixelSpriteComponent.h"
+#include "Visual/SpriteSheetDataAsset.h"
+#include "Weapons/WeaponDataAsset.h"
+#include "Weapons/ZombieWeapon.h"
+
+namespace
+{
+	/** Sprites sit just above the floor so walls and cover correctly occlude them. */
+	constexpr float SpriteHeightAboveFeet = 12.0f;
+	constexpr float WalkAnimationSpeedThreshold = 20.0f;
+}
 
 AZombiePlayerCharacter::AZombiePlayerCharacter()
 {
@@ -28,7 +43,7 @@ AZombiePlayerCharacter::AZombiePlayerCharacter()
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 1200.0f;
+	CameraBoom->TargetArmLength = 1600.0f;
 	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, 0.0f, 0.0f));
 	CameraBoom->bDoCollisionTest = false;
 	CameraBoom->bInheritPitch = false;
@@ -38,82 +53,61 @@ AZombiePlayerCharacter::AZombiePlayerCharacter()
 	TopDownCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
 	TopDownCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	TopDownCamera->ProjectionMode = ECameraProjectionMode::Orthographic;
-	TopDownCamera->OrthoWidth = 2000.0f;
+	TopDownCamera->OrthoWidth = CameraOrthoWidth;
 	TopDownCamera->bUsePawnControlRotation = false;
 
-	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
-	BodyMesh->SetupAttachment(GetCapsuleComponent());
-	BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	BodyMesh->SetCastShadow(true);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaceholderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (PlaceholderMeshFinder.Succeeded())
-	{
-		BodyMesh->SetStaticMesh(PlaceholderMeshFinder.Object);
-		// Engine cylinder is 100x100x100 uniform; scale to roughly match the default capsule
-		// (radius 34, half-height 88) so the placeholder doesn't dwarf/vanish inside it.
-		BodyMesh->SetRelativeScale3D(FVector(0.6f, 0.6f, 1.76f));
-		BodyMesh->SetRelativeLocation(FVector::ZeroVector);
-	}
+	const float FeetOffset = -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + SpriteHeightAboveFeet;
+
+	BodySprite = CreateDefaultSubobject<UPixelSpriteComponent>(TEXT("BodySprite"));
+	BodySprite->SetupAttachment(GetCapsuleComponent());
+	BodySprite->SetRelativeLocation(FVector(0.0f, 0.0f, FeetOffset));
+
+	WeaponSprite = CreateDefaultSubobject<UPixelSpriteComponent>(TEXT("WeaponSprite"));
+	WeaponSprite->SetupAttachment(GetCapsuleComponent());
+	WeaponSprite->SetRelativeLocation(FVector(0.0f, 0.0f, FeetOffset + 1.0f));
+
+	BodySheet = TSoftObjectPtr<USpriteSheetDataAsset>(FSoftObjectPath(TEXT("/Game/Sprites/Characters/SS_Player.SS_Player")));
+	WeaponSheet = TSoftObjectPtr<USpriteSheetDataAsset>(FSoftObjectPath(TEXT("/Game/Sprites/Characters/SS_PlayerWeapons.SS_PlayerWeapons")));
 
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 	StaminaComponent = CreateDefaultSubobject<UStaminaComponent>(TEXT("StaminaComponent"));
 	DamageComponent = CreateDefaultSubobject<UDamageComponent>(TEXT("DamageComponent"));
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
+	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+	WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
+	StatusEffectComponent = CreateDefaultSubobject<UStatusEffectComponent>(TEXT("StatusEffectComponent"));
+	ScreenShakeComponent = CreateDefaultSubobject<UScreenShakeComponent>(TEXT("ScreenShakeComponent"));
 
-	MoveAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Move"));
-	MoveAction->ValueType = EInputActionValueType::Axis2D;
-
-	SprintAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Sprint"));
-	SprintAction->ValueType = EInputActionValueType::Boolean;
-
-	InteractAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Interact"));
-	InteractAction->ValueType = EInputActionValueType::Boolean;
-
-	PauseAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Pause"));
-	PauseAction->ValueType = EInputActionValueType::Boolean;
-
-	DefaultMappingContext = CreateDefaultSubobject<UInputMappingContext>(TEXT("IMC_Default"));
-
-	// D: raw axis lands on X by default, which is exactly "right" here - no modifier needed.
-	DefaultMappingContext->MapKey(MoveAction, EKeys::D);
-	{
-		// Modifiers are UObjects created during CDO construction - must go through
-		// CreateDefaultSubobject (unique name required), not NewObject, or the engine fatals
-		// with "NewObject with empty name can't be used to create default subobjects".
-		FEnhancedActionKeyMapping& Mapping = DefaultMappingContext->MapKey(MoveAction, EKeys::A);
-		Mapping.Modifiers.Add(CreateDefaultSubobject<UInputModifierNegate>(TEXT("MoveNegateA")));
-	}
-	{
-		// W/S: swizzle the raw X output onto Y so they drive forward/back instead of left/right.
-		FEnhancedActionKeyMapping& Mapping = DefaultMappingContext->MapKey(MoveAction, EKeys::W);
-		UInputModifierSwizzleAxis* Swizzle = CreateDefaultSubobject<UInputModifierSwizzleAxis>(TEXT("MoveSwizzleW"));
-		Swizzle->Order = EInputAxisSwizzle::YXZ;
-		Mapping.Modifiers.Add(Swizzle);
-	}
-	{
-		FEnhancedActionKeyMapping& Mapping = DefaultMappingContext->MapKey(MoveAction, EKeys::S);
-		UInputModifierSwizzleAxis* Swizzle = CreateDefaultSubobject<UInputModifierSwizzleAxis>(TEXT("MoveSwizzleS"));
-		Swizzle->Order = EInputAxisSwizzle::YXZ;
-		Mapping.Modifiers.Add(Swizzle);
-		Mapping.Modifiers.Add(CreateDefaultSubobject<UInputModifierNegate>(TEXT("MoveNegateS")));
-	}
-
-	DefaultMappingContext->MapKey(SprintAction, EKeys::LeftShift);
-	DefaultMappingContext->MapKey(InteractAction, EKeys::E);
-	DefaultMappingContext->MapKey(PauseAction, EKeys::Escape);
+	InputConfig = CreateDefaultSubobject<UZombieInputConfig>(TEXT("InputConfig"));
 }
 
 void AZombiePlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	BodySprite->SetSpriteSheet(BodySheet.LoadSynchronous());
+	BodySprite->PlayAnimation(TEXT("Idle"));
+	WeaponSprite->SetSpriteSheet(WeaponSheet.LoadSynchronous());
+
+	HealthComponent->OnDeath.AddDynamic(this, &AZombiePlayerCharacter::HandleDeath);
+	DamageComponent->OnDamageReceived.AddUObject(this, &AZombiePlayerCharacter::HandleDamageReceived);
+	InventoryComponent->OnActiveWeaponChanged.AddUObject(this, &AZombiePlayerCharacter::HandleActiveWeaponChanged);
+	WeaponComponent->OnWeaponFired.AddUObject(this, &AZombiePlayerCharacter::HandleWeaponFired);
+	StatusEffectComponent->OnStatusEffectsChanged.AddUObject(this, &AZombiePlayerCharacter::HandleStatusEffectsChanged);
+
+	HandleActiveWeaponChanged(InventoryComponent->GetActiveWeapon());
+	HandleStatsChanged();
+}
+
+void AZombiePlayerCharacter::PawnClientRestart()
+{
+	Super::PawnClientRestart();
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
-		PC->bShowMouseCursor = true;
-
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			Subsystem->AddMappingContext(InputConfig->GameplayContext, 0);
 		}
 	}
 }
@@ -122,103 +116,295 @@ void AZombiePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+	if (!Input)
 	{
-		EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AZombiePlayerCharacter::HandleMove);
-		EnhancedInput->BindAction(SprintAction, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleSprintStarted);
-		EnhancedInput->BindAction(SprintAction, ETriggerEvent::Completed, this, &AZombiePlayerCharacter::HandleSprintStopped);
-		EnhancedInput->BindAction(SprintAction, ETriggerEvent::Canceled, this, &AZombiePlayerCharacter::HandleSprintStopped);
-		EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleInteract);
-		EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandlePause);
+		return;
 	}
+
+	Input->BindAction(InputConfig->Move, ETriggerEvent::Triggered, this, &AZombiePlayerCharacter::HandleMove);
+	Input->BindAction(InputConfig->AimStick, ETriggerEvent::Triggered, this, &AZombiePlayerCharacter::HandleAimStick);
+	Input->BindAction(InputConfig->Sprint, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleSprintStarted);
+	Input->BindAction(InputConfig->Sprint, ETriggerEvent::Completed, this, &AZombiePlayerCharacter::HandleSprintStopped);
+	Input->BindAction(InputConfig->Fire, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleFireStarted);
+	Input->BindAction(InputConfig->Fire, ETriggerEvent::Completed, this, &AZombiePlayerCharacter::HandleFireStopped);
+	Input->BindAction(InputConfig->Reload, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleReload);
+	Input->BindAction(InputConfig->Interact, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleInteract);
+	Input->BindAction(InputConfig->WeaponSlot, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleWeaponSlot);
+	Input->BindAction(InputConfig->CycleWeapon, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleCycleWeapon);
+}
+
+void AZombiePlayerCharacter::OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState)
+{
+	Super::OnPlayerStateChanged(NewPlayerState, OldPlayerState);
+
+	if (IZombieStatSource* OldSource = Cast<IZombieStatSource>(BoundStatSource.Get()))
+	{
+		OldSource->OnStatsChanged().Remove(StatsChangedHandle);
+	}
+	BoundStatSource.Reset();
+
+	if (IZombieStatSource* Source = ZombieStats::FindStatSource(this))
+	{
+		StatsChangedHandle = Source->OnStatsChanged().AddUObject(this, &AZombiePlayerCharacter::HandleStatsChanged);
+		BoundStatSource = Cast<UObject>(Source);
+	}
+	HandleStatsChanged();
 }
 
 void AZombiePlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (StaminaComponent)
+	if (bDead)
 	{
-		GetCharacterMovement()->MaxWalkSpeed = StaminaComponent->IsSprinting() ? SprintSpeed : WalkSpeed;
+		return;
 	}
 
-	UpdateAimRotation();
+	UpdateMovementSpeed();
+	UpdateMouseAim();
+	UpdateSpriteAnimation();
+}
+
+void AZombiePlayerCharacter::UpdateMovementSpeed()
+{
+	const float Base = StaminaComponent->IsSprinting() ? SprintSpeed : WalkSpeed;
+	GetCharacterMovement()->MaxWalkSpeed = Base * MoveSpeedMultiplier * StatusEffectComponent->GetMoveSpeedMultiplier();
+}
+
+void AZombiePlayerCharacter::UpdateSpriteAnimation()
+{
+	const bool bMoving = GetVelocity().SizeSquared2D() > FMath::Square(WalkAnimationSpeedThreshold);
+	BodySprite->PlayAnimation(bMoving ? FName(TEXT("Walk")) : FName(TEXT("Idle")));
 }
 
 void AZombiePlayerCharacter::HandleMove(const FInputActionValue& Value)
 {
-	// World-space, not actor-relative: aim (mouse) and movement (WASD) are decoupled, twin-stick
-	// style, so movement must not rotate with the character's facing.
-	const FVector2D MoveInput = Value.Get<FVector2D>();
-
-	if (!FMath::IsNearlyZero(MoveInput.X))
+	if (bInputBlocked)
 	{
-		AddMovementInput(FVector::RightVector, MoveInput.X);
+		return;
 	}
-	if (!FMath::IsNearlyZero(MoveInput.Y))
+
+	// World-space, not actor-relative: aim and movement are decoupled, twin-stick style.
+	const FVector2D MoveInput = Value.Get<FVector2D>();
+	AddMovementInput(FVector::RightVector, MoveInput.X);
+	AddMovementInput(FVector::ForwardVector, MoveInput.Y);
+}
+
+void AZombiePlayerCharacter::HandleAimStick(const FInputActionValue& Value)
+{
+	if (bInputBlocked)
 	{
-		AddMovementInput(FVector::ForwardVector, MoveInput.Y);
+		return;
+	}
+
+	// Screen up is world +X and screen right is world +Y for this camera.
+	const FVector2D Stick = Value.Get<FVector2D>();
+	const FVector Direction(Stick.Y, Stick.X, 0.0f);
+	if (!Direction.IsNearlyZero())
+	{
+		bGamepadAim = true;
+		ApplyFacing(Direction);
+		AimPoint = GetActorLocation() + Direction.GetSafeNormal() * 450.0f;
+	}
+}
+
+void AZombiePlayerCharacter::UpdateMouseAim()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC || bInputBlocked)
+	{
+		return;
+	}
+
+	float DeltaX = 0.0f, DeltaY = 0.0f;
+	PC->GetInputMouseDelta(DeltaX, DeltaY);
+	if (bGamepadAim && FMath::IsNearlyZero(DeltaX) && FMath::IsNearlyZero(DeltaY))
+	{
+		// Stick aim stays in charge until the mouse is actually moved.
+		AimPoint = GetActorLocation() + GetActorForwardVector() * 450.0f;
+		return;
+	}
+	bGamepadAim = false;
+
+	FVector WorldLocation, WorldDirection;
+	if (!PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection) || FMath::IsNearlyZero(WorldDirection.Z))
+	{
+		return;
+	}
+
+	// Aim on the plane of the character's own height, so the gun points exactly at the cursor.
+	const float T = (GetActorLocation().Z - WorldLocation.Z) / WorldDirection.Z;
+	AimPoint = WorldLocation + WorldDirection * T;
+	ApplyFacing(AimPoint - GetActorLocation());
+}
+
+void AZombiePlayerCharacter::ApplyFacing(const FVector& Direction)
+{
+	const FVector Flat(Direction.X, Direction.Y, 0.0f);
+	if (!Flat.IsNearlyZero())
+	{
+		SetActorRotation(Flat.Rotation());
 	}
 }
 
 void AZombiePlayerCharacter::HandleSprintStarted(const FInputActionValue& Value)
 {
-	if (StaminaComponent)
-	{
-		StaminaComponent->SetSprinting(true);
-	}
+	const UZombieGameInstance* GameInstance = Cast<UZombieGameInstance>(GetGameInstance());
+	const bool bToggle = GameInstance && GameInstance->GetUserSettings().bToggleSprint;
+	StaminaComponent->SetSprinting(bToggle ? !StaminaComponent->IsSprinting() : true);
 }
 
 void AZombiePlayerCharacter::HandleSprintStopped(const FInputActionValue& Value)
 {
-	if (StaminaComponent)
+	const UZombieGameInstance* GameInstance = Cast<UZombieGameInstance>(GetGameInstance());
+	if (!GameInstance || !GameInstance->GetUserSettings().bToggleSprint)
 	{
 		StaminaComponent->SetSprinting(false);
 	}
 }
 
+void AZombiePlayerCharacter::HandleFireStarted(const FInputActionValue& Value)
+{
+	if (!bInputBlocked)
+	{
+		WeaponComponent->StartFire();
+	}
+}
+
+void AZombiePlayerCharacter::HandleFireStopped(const FInputActionValue& Value)
+{
+	WeaponComponent->StopFire();
+}
+
+void AZombiePlayerCharacter::HandleReload(const FInputActionValue& Value)
+{
+	if (!bInputBlocked)
+	{
+		WeaponComponent->Reload();
+	}
+}
+
 void AZombiePlayerCharacter::HandleInteract(const FInputActionValue& Value)
 {
-	if (InteractionComponent)
+	if (!bInputBlocked)
 	{
 		InteractionComponent->TryInteract();
 	}
 }
 
-void AZombiePlayerCharacter::HandlePause(const FInputActionValue& Value)
+void AZombiePlayerCharacter::HandleWeaponSlot(const FInputActionValue& Value)
 {
-	const bool bNewPaused = !UGameplayStatics::IsGamePaused(this);
-	UGameplayStatics::SetGamePaused(this, bNewPaused);
+	const int32 SlotNumber = FMath::RoundToInt(Value.Get<float>());
+	if (!bInputBlocked && SlotNumber >= 1)
+	{
+		WeaponComponent->SelectSlot(SlotNumber - 1);
+	}
 }
 
-void AZombiePlayerCharacter::UpdateAimRotation()
+void AZombiePlayerCharacter::HandleCycleWeapon(const FInputActionValue& Value)
 {
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC)
+	const float Direction = Value.Get<float>();
+	if (!bInputBlocked && !FMath::IsNearlyZero(Direction))
+	{
+		WeaponComponent->CycleWeapon(Direction > 0.0f ? 1 : -1);
+	}
+}
+
+void AZombiePlayerCharacter::HandleStatsChanged()
+{
+	MoveSpeedMultiplier = ZombieStats::Resolve(this, ZombieTags::Stat_Move_Speed, 1.0f);
+	StaminaComponent->SetDrainMultiplier(ZombieStats::Resolve(this, ZombieTags::Stat_Stamina_DrainRate, 1.0f));
+
+	// Extra Health raises the ceiling and grants the new headroom, rather than leaving it empty.
+	const float OldMax = HealthComponent->GetMaxHealth();
+	const float NewMax = ZombieStats::Resolve(this, ZombieTags::Stat_Health_Max, BaseMaxHealth);
+	if (!FMath::IsNearlyEqual(OldMax, NewMax))
+	{
+		HealthComponent->SetMaxHealth(NewMax, false);
+		if (NewMax > OldMax)
+		{
+			HealthComponent->Heal(NewMax - OldMax);
+		}
+	}
+
+	InventoryComponent->RefreshWeaponStats();
+}
+
+void AZombiePlayerCharacter::HandleActiveWeaponChanged(AZombieWeapon* NewWeapon)
+{
+	const UWeaponDataAsset* Definition = NewWeapon ? NewWeapon->GetDefinition() : nullptr;
+	WeaponSprite->SetVisibility(Definition != nullptr);
+	if (Definition)
+	{
+		WeaponSprite->ShowFrame(Definition->HeldSpriteFrame);
+	}
+}
+
+void AZombiePlayerCharacter::HandleWeaponFired(float ShakeStrength)
+{
+	AddScreenShake(ShakeStrength);
+}
+
+void AZombiePlayerCharacter::HandleDamageReceived(float Amount, AActor* Causer, const UDamageType* DamageType)
+{
+	BodySprite->Flash(FLinearColor(1.0f, 0.15f, 0.1f), 0.12f);
+	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
+	{
+		Audio->PlayNamedSoundAtLocation(TEXT("Player.Hurt"), GetActorLocation());
+	}
+	AddScreenShake(FMath::Clamp(Amount / 60.0f, 0.1f, 0.6f));
+
+	if (AZombiePlayerState* ZombiePlayerState = GetPlayerState<AZombiePlayerState>())
+	{
+		ZombiePlayerState->RecordDamageTaken(Amount);
+	}
+}
+
+void AZombiePlayerCharacter::HandleStatusEffectsChanged()
+{
+	BodySprite->SetTint(StatusEffectComponent->GetDisplayTint());
+}
+
+void AZombiePlayerCharacter::AddScreenShake(float Trauma)
+{
+	if (IsLocallyControlled())
+	{
+		ScreenShakeComponent->AddTrauma(Trauma);
+	}
+}
+
+void AZombiePlayerCharacter::SetGameplayInputBlocked(bool bBlocked)
+{
+	bInputBlocked = bBlocked;
+	WeaponComponent->SetWeaponsBlocked(bBlocked || bDead);
+	if (bBlocked)
+	{
+		StaminaComponent->SetSprinting(false);
+	}
+}
+
+void AZombiePlayerCharacter::HandleDeath()
+{
+	if (bDead)
 	{
 		return;
 	}
+	bDead = true;
 
-	FVector WorldLocation, WorldDirection;
-	if (!PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+	WeaponComponent->SetWeaponsBlocked(true);
+	StatusEffectComponent->ClearAll();
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->DisableMovement();
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
+	BodySprite->PlayAnimation(TEXT("Death"), true);
+	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		return;
+		Audio->PlayNamedSound2D(TEXT("Player.Death"));
 	}
+	WeaponSprite->SetVisibility(false);
+	AddScreenShake(0.8f);
 
-	if (FMath::IsNearlyZero(WorldDirection.Z))
-	{
-		return;
-	}
-
-	const float ActorZ = GetActorLocation().Z;
-	const float T = (ActorZ - WorldLocation.Z) / WorldDirection.Z;
-	const FVector AimPoint = WorldLocation + WorldDirection * T;
-
-	FVector LookDirection = AimPoint - GetActorLocation();
-	LookDirection.Z = 0.0f;
-
-	if (!LookDirection.IsNearlyZero())
-	{
-		SetActorRotation(LookDirection.Rotation());
-	}
+	OnPlayerDied.Broadcast(this);
 }

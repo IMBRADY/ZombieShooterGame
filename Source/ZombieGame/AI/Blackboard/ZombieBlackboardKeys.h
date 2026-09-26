@@ -22,4 +22,13 @@ namespace ZombieBlackboardKeys
 
 	/** Bool: target is close enough to attack. Maintained by BTService_ZombieCombatState. */
 	ZOMBIEGAME_API extern const FName InAttackRange;
+
+	/** Bool: one of the zombie's abilities can be used on the target right now. */
+	ZOMBIEGAME_API extern const FName AbilityReady;
+
+	/** Bool: a ranged zombie's target is uncomfortably close - back off. */
+	ZOMBIEGAME_API extern const FName TooClose;
+
+	/** Bool: a ranged zombie is at its preferred distance - hold position. */
+	ZOMBIEGAME_API extern const FName InPreferredRange;
 }

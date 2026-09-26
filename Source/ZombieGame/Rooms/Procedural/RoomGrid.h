@@ -30,6 +30,9 @@ struct ZOMBIEGAME_API FRoomGrid
 	 */
 	bool ParseFrom(const TArray<FString>& Rows, FString& OutError);
 
+	/** Turns every optional obstacle into a real obstacle (with ObstacleChance) or plain floor. */
+	void ResolveOptionalTiles(FRandomStream& Random, float ObstacleChance);
+
 	/** Returns this grid rotated clockwise by the given number of quarter turns. */
 	FRoomGrid Rotated(int32 QuarterTurns) const;
 

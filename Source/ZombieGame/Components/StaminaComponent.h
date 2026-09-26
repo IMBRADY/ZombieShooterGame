@@ -24,6 +24,9 @@ public:
 
 	void SetSprinting(bool bNewSprinting);
 
+	/** Scales the drain rate - Sprint Efficiency perks push this below 1. */
+	void SetDrainMultiplier(float Multiplier) { DrainMultiplier = FMath::Max(Multiplier, 0.05f); }
+
 	UPROPERTY(BlueprintAssignable)
 	FOnStaminaChanged OnStaminaChanged;
 
@@ -34,7 +37,7 @@ protected:
 	float MaxStamina = 100.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Stamina")
-	float DrainPerSecond = 25.0f;
+	float DrainPerSecond = 20.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Stamina")
 	float RechargeDelay = 0.5f;
@@ -50,5 +53,6 @@ protected:
 
 private:
 	bool bIsSprinting = false;
+	float DrainMultiplier = 1.0f;
 	float TimeSinceSprintStopped = 0.0f;
 };

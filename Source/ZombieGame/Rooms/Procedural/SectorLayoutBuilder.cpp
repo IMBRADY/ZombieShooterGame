@@ -131,7 +131,9 @@ namespace
 
 		for (const FSectorRoomCandidate& Candidate : Params.Candidates)
 		{
-			if (!Candidate.Grid || Candidate.Grid->IsEmpty() || Candidate.Type == ERoomType::Start)
+			// Start, boss and shop rooms are placed deliberately, never drawn at random.
+			if (!Candidate.Grid || Candidate.Grid->IsEmpty() || Candidate.Type == ERoomType::Start
+				|| Candidate.Type == ERoomType::Boss || Candidate.Type == ERoomType::Intermission)
 			{
 				continue;
 			}
@@ -219,6 +221,53 @@ namespace
 		return true;
 	}
 
+	/**
+	 * Attaches a boss arena as deep into the sector as it will fit: open doorways are tried in
+	 * order of distance from the start, so the fight sits at the end of the run through the sector.
+	 */
+	int32 AttachBossRoom(FSectorBuildState& State, const FSectorLayoutParams& Params, const TArray<int32>& HopCounts, FRandomStream& Random)
+	{
+		TArray<const FSectorRoomCandidate*> Arenas;
+		for (const FSectorRoomCandidate& Candidate : Params.Candidates)
+		{
+			if (Candidate.Type == ERoomType::Boss && Candidate.Grid && !Candidate.Grid->IsEmpty())
+			{
+				Arenas.Add(&Candidate);
+			}
+		}
+		if (Arenas.Num() == 0)
+		{
+			return INDEX_NONE;
+		}
+
+		TArray<FOpenDoorway> Doorways = State.Frontier;
+		Doorways.Sort([&HopCounts](const FOpenDoorway& Lhs, const FOpenDoorway& Rhs)
+		{
+			const int32 LhsHops = HopCounts.IsValidIndex(Lhs.RoomIndex) ? HopCounts[Lhs.RoomIndex] : 0;
+			const int32 RhsHops = HopCounts.IsValidIndex(Rhs.RoomIndex) ? HopCounts[Rhs.RoomIndex] : 0;
+			return LhsHops > RhsHops;
+		});
+
+		for (const FOpenDoorway& Doorway : Doorways)
+		{
+			int32 PoolIndex = INDEX_NONE;
+			const FSectorRoomCandidate* Arena = PickWeighted(Arenas, Random, PoolIndex);
+			if (Arena && TryAttachCandidate(State, *Arena, Doorway, Random))
+			{
+				return State.Layout.Rooms.Num() - 1;
+			}
+		}
+		return INDEX_NONE;
+	}
+
+	void ResolveOptionalObstacles(FSectorLayout& Layout, float Chance, FRandomStream& Random)
+	{
+		for (FSectorRoomPlacement& Room : Layout.Rooms)
+		{
+			Room.Grid.ResolveOptionalTiles(Random, Chance);
+		}
+	}
+
 	void FinaliseBounds(FSectorLayout& Layout)
 	{
 		bool bFirst = true;
@@ -275,10 +324,17 @@ FSectorLayout FSectorLayoutBuilder::Build(const FSectorLayoutParams& Params)
 		}
 	}
 
-	FinaliseBounds(State.Layout);
-
 	TArray<int32> HopCounts;
-	const TSet<int32> Reachable = GatherReachableRooms(State.Layout, &HopCounts);
+	TSet<int32> Reachable = GatherReachableRooms(State.Layout, &HopCounts);
+
+	if (Params.bRequireBossRoom)
+	{
+		State.Layout.BossRoomIndex = AttachBossRoom(State, Params, HopCounts, Random);
+		Reachable = GatherReachableRooms(State.Layout, &HopCounts);
+	}
+
+	ResolveOptionalObstacles(State.Layout, Params.OptionalObstacleChance, Random);
+	FinaliseBounds(State.Layout);
 
 	int32 FurthestRoom = State.Layout.StartRoomIndex;
 	for (const int32 RoomIndex : Reachable)
@@ -288,7 +344,9 @@ FSectorLayout FSectorLayoutBuilder::Build(const FSectorLayoutParams& Params)
 			FurthestRoom = RoomIndex;
 		}
 	}
-	State.Layout.ExitRoomIndex = FurthestRoom;
+
+	// The boss arena is the way out: the key drops when the boss does.
+	State.Layout.ExitRoomIndex = State.Layout.BossRoomIndex != INDEX_NONE ? State.Layout.BossRoomIndex : FurthestRoom;
 
 	FString ValidationError;
 	if (!Validate(State.Layout, ValidationError))
@@ -301,6 +359,29 @@ FSectorLayout FSectorLayoutBuilder::Build(const FSectorLayoutParams& Params)
 		Params.Seed, State.Layout.Rooms.Num(), State.CombatRoomCount, State.Layout.Connections.Num(), State.Layout.ExitRoomIndex);
 
 	return State.Layout;
+}
+
+FSectorLayout FSectorLayoutBuilder::BuildSingleRoom(const FSectorRoomCandidate& Candidate, int32 Seed)
+{
+	FSectorLayout Layout;
+	if (!Candidate.Grid || Candidate.Grid->IsEmpty())
+	{
+		return Layout;
+	}
+
+	FRandomStream Random(Seed);
+
+	FSectorRoomPlacement& Room = Layout.Rooms.AddDefaulted_GetRef();
+	Room.SourceIndex = Candidate.SourceIndex;
+	Room.Type = Candidate.Type;
+	Room.Grid = *Candidate.Grid;
+	Room.Grid.ResolveOptionalTiles(Random, 0.5f);
+
+	Layout.Seed = Seed;
+	Layout.StartRoomIndex = 0;
+	Layout.ExitRoomIndex = 0;
+	FinaliseBounds(Layout);
+	return Layout;
 }
 
 TSet<int32> FSectorLayoutBuilder::GatherReachableRooms(const FSectorLayout& Layout, TArray<int32>* OutHopCounts)

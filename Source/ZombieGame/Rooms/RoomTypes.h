@@ -13,7 +13,10 @@ enum class ERoomType : uint8
 	Hallway		UMETA(DisplayName = "Hallway"),
 	DeadEnd		UMETA(DisplayName = "Dead End"),
 	Treasure	UMETA(DisplayName = "Treasure Room"),
-	Boss		UMETA(DisplayName = "Boss Room")
+	Boss		UMETA(DisplayName = "Boss Room"),
+
+	/** The between-sector shop. Never part of a sector - built on its own by the generator. */
+	Intermission	UMETA(DisplayName = "Intermission (Shop)")
 };
 
 // One character of a handcrafted room layout. The generator never invents these - a designer
@@ -28,7 +31,13 @@ enum class ERoomTile : uint8
 	Door			UMETA(DisplayName = "Doorway"),
 	Obstacle		UMETA(DisplayName = "Obstacle / cover"),
 	ZombieSpawn		UMETA(DisplayName = "Zombie spawn point"),
-	PlayerStart		UMETA(DisplayName = "Player start")
+	PlayerStart		UMETA(DisplayName = "Player start"),
+
+	/**
+	 * Cover that may or may not be there ("random obstacle placement"). Validated as if present -
+	 * so resolving it either way can never cut a room in two - and resolved per placement.
+	 */
+	OptionalObstacle	UMETA(DisplayName = "Optional obstacle")
 };
 
 // Grid axes: +X is a column step (world +X), +Y is a row step (world +Y). Row 0 of a layout is

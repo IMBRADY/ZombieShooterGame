@@ -1,11 +1,12 @@
 #include "SpawnDirectorComponent.h"
 #include "Characters/Zombies/ZombieCharacter.h"
+#include "Characters/Zombies/ZombieEnemyManager.h"
 #include "Core/SpawnDirectorSettings.h"
 #include "Core/ZombieGameState.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 #include "Utilities/ZombiePrimaryAssetLoader.h"
 #include "ZombieGame.h"
 
@@ -15,6 +16,16 @@ USpawnDirectorComponent::USpawnDirectorComponent()
 
 	SettingsAsset = TSoftObjectPtr<USpawnDirectorSettings>(
 		FSoftObjectPath(TEXT("/Game/DataAssets/Zombies/DA_SpawnDirector.DA_SpawnDirector")));
+}
+
+void USpawnDirectorComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this))
+	{
+		Enemies->OnEnemyDied.AddUObject(this, &USpawnDirectorComponent::HandleEnemyDied);
+	}
 }
 
 USpawnDirectorSettings* USpawnDirectorComponent::ResolveSettings() const
@@ -28,12 +39,33 @@ USpawnDirectorSettings* USpawnDirectorComponent::ResolveSettings() const
 	return nullptr;
 }
 
-void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& SpawnPoints)
+void USpawnDirectorComponent::GatherEligibleArchetypes(int32 Sector, TArray<UZombieArchetypeDataAsset*>& OutArchetypes) const
+{
+	TArray<UZombieArchetypeDataAsset*> Discovered;
+	FZombiePrimaryAssetLoader::LoadAllOfType(UZombieArchetypeDataAsset::AssetType, Discovered);
+
+	for (UZombieArchetypeDataAsset* Archetype : Discovered)
+	{
+		if (Archetype && Archetype->MinSector <= Sector && Archetype->Tier != EZombieClassTier::Boss)
+		{
+			OutArchetypes.Add(Archetype);
+		}
+	}
+
+	// Stable ordering keeps a given run seed reproducible regardless of asset enumeration order.
+	OutArchetypes.Sort([](const UZombieArchetypeDataAsset& Lhs, const UZombieArchetypeDataAsset& Rhs)
+	{
+		return Lhs.GetName() < Rhs.GetName();
+	});
+}
+
+void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& SpawnPoints, const UZombieArchetypeDataAsset* BossArchetype)
 {
 	StopSector();
 
 	USpawnDirectorSettings* Settings = ResolveSettings();
-	if (!Settings)
+	UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this);
+	if (!Settings || !Enemies)
 	{
 		return;
 	}
@@ -44,45 +76,24 @@ void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& S
 		return;
 	}
 
-	TArray<UZombieArchetypeDataAsset*> DiscoveredArchetypes;
-	FZombiePrimaryAssetLoader::LoadAllOfType(UZombieArchetypeDataAsset::AssetType, DiscoveredArchetypes);
-
 	TArray<UZombieArchetypeDataAsset*> EligibleArchetypes;
-	for (UZombieArchetypeDataAsset* Archetype : DiscoveredArchetypes)
-	{
-		if (Archetype && Archetype->MinSector <= Sector && Archetype->Tier != EZombieClassTier::Boss)
-		{
-			EligibleArchetypes.Add(Archetype);
-		}
-	}
-
-	if (EligibleArchetypes.Num() == 0)
-	{
-		UE_LOG(LogZombieGame, Error, TEXT("Sector %d has no eligible zombie archetypes; nothing will spawn."), Sector);
-		return;
-	}
-
-	// Stable ordering keeps a given run seed reproducible regardless of asset enumeration order.
-	EligibleArchetypes.Sort([](const UZombieArchetypeDataAsset& Lhs, const UZombieArchetypeDataAsset& Rhs)
-	{
-		return Lhs.GetName() < Rhs.GetName();
-	});
+	GatherEligibleArchetypes(Sector, EligibleArchetypes);
 
 	CurrentSector = Sector;
-	CurrentScaling = Settings->GetScalingForSector(Sector);
 	AvailableSpawnPoints = SpawnPoints;
+	PendingBoss = BossArchetype;
 	bSectorActive = true;
+	Enemies->SetSectorScaling(Settings->GetScalingForSector(Sector));
 
 	BuildSpawnQueue(Sector, Settings->GetBudgetForSector(Sector), EligibleArchetypes);
 	PublishEncounterState();
 
-	if (SpawnQueue.Num() == 0)
+	if (SpawnQueue.Num() == 0 && !PendingBoss)
 	{
 		// Nothing affordable ever came out of the budget - treat the sector as immediately clear
 		// rather than leaving the run stuck waiting on zombies that will never arrive.
 		UE_LOG(LogZombieGame, Warning, TEXT("Sector %d produced an empty spawn queue; clearing immediately."), Sector);
-		bSectorActive = false;
-		OnSectorCleared.Broadcast();
+		CheckSectorCleared(SpawnPoints[0]);
 		return;
 	}
 
@@ -109,13 +120,8 @@ void USpawnDirectorComponent::BuildSpawnQueue(int32 Sector, int32 Budget, const 
 
 		for (UZombieArchetypeDataAsset* Archetype : Archetypes)
 		{
-			if (Archetype->SpawnCost > RemainingBudget)
-			{
-				continue;
-			}
-
 			const float Weight = Archetype->SelectionWeight * Settings->GetTierWeight(Archetype->Tier, Sector);
-			if (Weight > 0.0f)
+			if (Archetype->SpawnCost <= RemainingBudget && Weight > 0.0f)
 			{
 				Affordable.Add(Archetype);
 				TotalWeight += Weight;
@@ -140,20 +146,15 @@ void USpawnDirectorComponent::BuildSpawnQueue(int32 Sector, int32 Budget, const 
 		}
 	}
 
-	UE_LOG(LogZombieGame, Log, TEXT("Sector %d: budget %d spent on %d zombies (health x%.2f, damage x%.2f)."),
-		Sector, Budget, SpawnQueue.Num(), CurrentScaling.HealthMultiplier, CurrentScaling.DamageMultiplier);
+	UE_LOG(LogZombieGame, Log, TEXT("Sector %d: budget %d spent on %d zombies%s."),
+		Sector, Budget, SpawnQueue.Num(), PendingBoss ? TEXT(" plus a boss") : TEXT(""));
 }
 
 void USpawnDirectorComponent::ScheduleNextSpawn()
 {
 	UWorld* World = GetWorld();
 	USpawnDirectorSettings* Settings = ResolveSettings();
-	if (!World || !Settings || !bSectorActive)
-	{
-		return;
-	}
-
-	if (SpawnQueue.Num() == 0)
+	if (!World || !Settings || !bSectorActive || SpawnQueue.Num() == 0)
 	{
 		return;
 	}
@@ -176,10 +177,15 @@ bool USpawnDirectorComponent::TrySelectSpawnLocation(FVector& OutLocation) const
 		}
 	}
 
+	if (AvailableSpawnPoints.Num() == 0)
+	{
+		return false;
+	}
+
 	// Prefer points beyond the "don't spawn in their lap" radius; if the player is standing in the
 	// middle of every spawn point, fall back to the furthest rather than refusing to spawn.
 	TArray<FVector> Candidates;
-	FVector FurthestPoint = FVector::ZeroVector;
+	FVector FurthestPoint = AvailableSpawnPoints[0];
 	float FurthestDistanceSquared = -1.0f;
 
 	for (const FVector& SpawnPoint : AvailableSpawnPoints)
@@ -202,64 +208,27 @@ bool USpawnDirectorComponent::TrySelectSpawnLocation(FVector& OutLocation) const
 		}
 	}
 
-	if (AvailableSpawnPoints.Num() == 0)
-	{
-		return false;
-	}
-
 	OutLocation = Candidates.Num() > 0 ? Candidates[FMath::RandRange(0, Candidates.Num() - 1)] : FurthestPoint;
 	return true;
 }
 
 void USpawnDirectorComponent::SpawnNextZombie()
 {
-	UWorld* World = GetWorld();
-	if (!World || !bSectorActive || SpawnQueue.Num() == 0)
+	UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this);
+	const USpawnDirectorSettings* Settings = SettingsAsset.Get();
+	if (!Enemies || !bSectorActive || SpawnQueue.Num() == 0)
 	{
 		return;
 	}
 
-	const USpawnDirectorSettings* Settings = SettingsAsset.Get();
-	const int32 MaxConcurrent = Settings ? Settings->MaxConcurrentZombies : 40;
-
 	// At the cap the queue simply waits - the sector's total stays the same, its shape changes.
-	if (LiveZombies.Num() < MaxConcurrent)
+	const int32 MaxConcurrent = Settings ? Settings->MaxConcurrentZombies : 40;
+	FVector SpawnLocation;
+	if (Enemies->GetLiveCount() < MaxConcurrent && TrySelectSpawnLocation(SpawnLocation))
 	{
-		FVector SpawnLocation = FVector::ZeroVector;
-		const UZombieArchetypeDataAsset* Archetype = SpawnQueue[0];
-
-		if (Archetype && TrySelectSpawnLocation(SpawnLocation))
+		if (Enemies->SpawnZombie(SpawnQueue[0], SpawnLocation, FZombieSpawnOptions()))
 		{
-			UClass* ZombieClass = Archetype->ZombieClass.IsNull()
-				? AZombieCharacter::StaticClass()
-				: Archetype->ZombieClass.LoadSynchronous();
-
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-			SpawnParams.Owner = GetOwner();
-
-			const FTransform SpawnTransform(FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f), SpawnLocation);
-
-			// Deferred so the archetype is applied before BeginPlay: the pawn is never briefly
-			// alive with default health, and its AI controller reads final stats on possession.
-			AZombieCharacter* Zombie = World->SpawnActorDeferred<AZombieCharacter>(
-				ZombieClass ? ZombieClass : AZombieCharacter::StaticClass(), SpawnTransform, GetOwner(),
-				nullptr, SpawnParams.SpawnCollisionHandlingOverride);
-
-			if (Zombie)
-			{
-				Zombie->InitializeFromArchetype(Archetype, CurrentScaling);
-				Zombie->OnZombieDied.AddUObject(this, &USpawnDirectorComponent::HandleZombieDied);
-				Zombie->FinishSpawning(SpawnTransform);
-
-				SpawnQueue.RemoveAt(0, EAllowShrinking::No);
-				LiveZombies.Add(Zombie);
-
-				if (AZombieGameState* GameState = World->GetGameState<AZombieGameState>())
-				{
-					GameState->AddActiveZombie(Zombie);
-				}
-			}
+			SpawnQueue.RemoveAt(0, EAllowShrinking::No);
 		}
 	}
 
@@ -267,33 +236,50 @@ void USpawnDirectorComponent::SpawnNextZombie()
 	ScheduleNextSpawn();
 }
 
-void USpawnDirectorComponent::HandleZombieDied(AZombieCharacter* Zombie, AController* Killer)
+AZombieCharacter* USpawnDirectorComponent::ReleaseBoss(const FVector& Location)
 {
-	LiveZombies.Remove(Zombie);
-
-	if (UWorld* World = GetWorld())
+	UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this);
+	if (!PendingBoss || !Enemies || !bSectorActive)
 	{
-		if (AZombieGameState* GameState = World->GetGameState<AZombieGameState>())
-		{
-			GameState->RemoveActiveZombie(Zombie);
-		}
+		return nullptr;
 	}
 
-	OnZombieKilled.Broadcast(Zombie, Killer);
+	FZombieSpawnOptions Options;
+	Options.bIsBoss = true;
+	AZombieCharacter* Boss = Enemies->SpawnZombie(PendingBoss, Location, Options);
+	if (Boss)
+	{
+		PendingBoss = nullptr;
+		OnBossSpawned.Broadcast(Boss);
+		PublishEncounterState();
+	}
+	return Boss;
+}
+
+void USpawnDirectorComponent::HandleEnemyDied(AZombieCharacter* Zombie, AController* Killer)
+{
 	PublishEncounterState();
+	CheckSectorCleared(Zombie ? Zombie->GetActorLocation() : FVector::ZeroVector);
+}
 
-	if (bSectorActive && SpawnQueue.Num() == 0 && LiveZombies.Num() == 0)
+void USpawnDirectorComponent::CheckSectorCleared(const FVector& LastKillLocation)
+{
+	const UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this);
+	if (!bSectorActive || SpawnQueue.Num() > 0 || PendingBoss || (Enemies && Enemies->GetLiveCount() > 0))
 	{
-		bSectorActive = false;
-		UE_LOG(LogZombieGame, Log, TEXT("Sector %d cleared: budget exhausted and no zombies remain."), CurrentSector);
-		OnSectorCleared.Broadcast();
+		return;
 	}
+
+	bSectorActive = false;
+	UE_LOG(LogZombieGame, Log, TEXT("Sector %d cleared: budget exhausted and no zombies remain."), CurrentSector);
+	OnSectorCleared.Broadcast(LastKillLocation);
 }
 
 void USpawnDirectorComponent::PublishEncounterState() const
 {
 	UWorld* World = GetWorld();
 	AZombieGameState* GameState = World ? World->GetGameState<AZombieGameState>() : nullptr;
+	const UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this);
 	if (!GameState)
 	{
 		return;
@@ -306,32 +292,24 @@ void USpawnDirectorComponent::PublishEncounterState() const
 	}
 
 	GameState->SetSpawnBudget(RemainingBudget);
-	GameState->SetRemainingEnemies(SpawnQueue.Num() + LiveZombies.Num());
+	GameState->SetRemainingEnemies(SpawnQueue.Num() + (Enemies ? Enemies->GetLiveCount() : 0) + (PendingBoss ? 1 : 0));
 }
 
 void USpawnDirectorComponent::StopSector()
 {
 	bSectorActive = false;
+	PendingBoss = nullptr;
 
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(SpawnTimer);
-
-		AZombieGameState* GameState = World->GetGameState<AZombieGameState>();
-		for (AZombieCharacter* Zombie : LiveZombies)
-		{
-			if (IsValid(Zombie))
-			{
-				if (GameState)
-				{
-					GameState->RemoveActiveZombie(Zombie);
-				}
-				Zombie->Destroy();
-			}
-		}
+	}
+	if (UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this))
+	{
+		Enemies->ClearAll();
 	}
 
-	LiveZombies.Reset();
 	SpawnQueue.Reset();
 	AvailableSpawnPoints.Reset();
+	PublishEncounterState();
 }

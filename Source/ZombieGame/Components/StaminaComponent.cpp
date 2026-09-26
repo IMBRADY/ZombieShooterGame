@@ -34,7 +34,7 @@ void UStaminaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 
 	if (bIsSprinting)
 	{
-		Stamina = FMath::Max(0.0f, Stamina - DrainPerSecond * DeltaTime);
+		Stamina = FMath::Max(0.0f, Stamina - DrainPerSecond * DrainMultiplier * DeltaTime);
 		if (Stamina <= 0.0f)
 		{
 			bIsSprinting = false;

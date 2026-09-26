@@ -159,6 +159,13 @@ void AZombieAIController::HandleSightUpdate(AActor* Actor, const FAIStimulus& St
 	if (Stimulus.WasSuccessfullySensed())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(ForgetTargetTimer);
+		if (BlackboardComponent->GetValueAsObject(ZombieBlackboardKeys::TargetActor) != Actor)
+		{
+			if (AZombieCharacter* Zombie = Cast<AZombieCharacter>(GetPawn()))
+			{
+				Zombie->PlayAlertSound();
+			}
+		}
 		BlackboardComponent->SetValueAsObject(ZombieBlackboardKeys::TargetActor, Actor);
 		BlackboardComponent->ClearValue(ZombieBlackboardKeys::InvestigateLocation);
 		return;

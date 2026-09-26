@@ -1,0 +1,980 @@
+{
+ "sheets": [
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Player",
+   "texture": "T_Player",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Player.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 2,
+   "animations": {
+    "Pistol": {
+     "start": 0,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "SMG": {
+     "start": 1,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "Shotgun": {
+     "start": 2,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "Rifle": {
+     "start": 3,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "Sniper": {
+     "start": 4,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "RocketLauncher": {
+     "start": 5,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "Special": {
+     "start": 6,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "Revolver": {
+     "start": 7,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    }
+   },
+   "name": "SS_PlayerWeapons",
+   "texture": "T_PlayerWeapons",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_PlayerWeapons.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Common",
+   "texture": "T_Zombie_Common",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Common.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Runner",
+   "texture": "T_Zombie_Runner",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Runner.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Tank",
+   "texture": "T_Zombie_Tank",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Tank.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Lobber",
+   "texture": "T_Zombie_Lobber",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Lobber.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Exploder",
+   "texture": "T_Zombie_Exploder",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Exploder.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Poison",
+   "texture": "T_Zombie_Poison",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Poison.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Armored",
+   "texture": "T_Zombie_Armored",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Armored.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Zombie_Necromancer",
+   "texture": "T_Zombie_Necromancer",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Zombie_Necromancer.png",
+   "world_size": 210
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Boss_Butcher",
+   "texture": "T_Boss_Butcher",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Boss_Butcher.png",
+   "world_size": 420
+  },
+  {
+   "columns": 4,
+   "rows": 4,
+   "animations": {
+    "Idle": {
+     "start": 0,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "Walk": {
+     "start": 4,
+     "count": 4,
+     "fps": 8.0,
+     "loop": true
+    },
+    "Attack": {
+     "start": 8,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    },
+    "Death": {
+     "start": 12,
+     "count": 4,
+     "fps": 10.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Boss_PlagueMother",
+   "texture": "T_Boss_PlagueMother",
+   "folder": "Characters",
+   "file": "SourceAssets\\Art\\Characters\\T_Boss_PlagueMother.png",
+   "world_size": 420
+  },
+  {
+   "columns": 3,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 3,
+     "fps": 30.0,
+     "loop": false
+    }
+   },
+   "name": "SS_MuzzleFlash",
+   "texture": "T_MuzzleFlash",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_MuzzleFlash.png",
+   "world_size": 80
+  },
+  {
+   "columns": 4,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 4,
+     "fps": 16.0,
+     "loop": false
+    }
+   },
+   "name": "SS_BloodHit",
+   "texture": "T_BloodHit",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_BloodHit.png",
+   "world_size": 100
+  },
+  {
+   "columns": 4,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 4,
+     "fps": 16.0,
+     "loop": false
+    }
+   },
+   "name": "SS_AcidHit",
+   "texture": "T_AcidHit",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_AcidHit.png",
+   "world_size": 110
+  },
+  {
+   "columns": 4,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 4,
+     "fps": 20.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Sparks",
+   "texture": "T_Sparks",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_Sparks.png",
+   "world_size": 60
+  },
+  {
+   "columns": 4,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 4,
+     "fps": 12.0,
+     "loop": false
+    }
+   },
+   "name": "SS_DeathPuff",
+   "texture": "T_DeathPuff",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_DeathPuff.png",
+   "world_size": 170
+  },
+  {
+   "columns": 4,
+   "rows": 2,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 6,
+     "fps": 12.0,
+     "loop": false
+    }
+   },
+   "name": "SS_ReviveGlow",
+   "texture": "T_ReviveGlow",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_ReviveGlow.png",
+   "world_size": 220
+  },
+  {
+   "columns": 4,
+   "rows": 2,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 8,
+     "fps": 16.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Explosion",
+   "texture": "T_Explosion",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_Explosion.png",
+   "world_size": 420
+  },
+  {
+   "columns": 4,
+   "rows": 2,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 6,
+     "fps": 14.0,
+     "loop": false
+    }
+   },
+   "name": "SS_SlamRing",
+   "texture": "T_SlamRing",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_SlamRing.png",
+   "world_size": 420
+  },
+  {
+   "columns": 1,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    }
+   },
+   "name": "SS_Tracer",
+   "texture": "T_Tracer",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_Tracer.png",
+   "world_size": 100
+  },
+  {
+   "columns": 1,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    }
+   },
+   "name": "SS_DecalBlood",
+   "texture": "T_DecalBlood",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_DecalBlood.png",
+   "world_size": 170
+  },
+  {
+   "columns": 1,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    }
+   },
+   "name": "SS_DecalBloodLarge",
+   "texture": "T_DecalBloodLarge",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_DecalBloodLarge.png",
+   "world_size": 260
+  },
+  {
+   "columns": 1,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    }
+   },
+   "name": "SS_DecalScorch",
+   "texture": "T_DecalScorch",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_DecalScorch.png",
+   "world_size": 320
+  },
+  {
+   "columns": 1,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    }
+   },
+   "name": "SS_DecalAcid",
+   "texture": "T_DecalAcid",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_DecalAcid.png",
+   "world_size": 160
+  },
+  {
+   "columns": 4,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 4,
+     "fps": 5.0,
+     "loop": true
+    }
+   },
+   "name": "SS_PoisonPuddle",
+   "texture": "T_PoisonPuddle",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_PoisonPuddle.png",
+   "world_size": 100
+  },
+  {
+   "columns": 4,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 4,
+     "fps": 5.0,
+     "loop": true
+    }
+   },
+   "name": "SS_AcidPuddle",
+   "texture": "T_AcidPuddle",
+   "folder": "Effects",
+   "file": "SourceAssets\\Art\\Effects\\T_AcidPuddle.png",
+   "world_size": 100
+  },
+  {
+   "columns": 2,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 2,
+     "fps": 12.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Proj_Rocket",
+   "texture": "T_Proj_Rocket",
+   "folder": "Projectiles",
+   "file": "SourceAssets\\Art\\Projectiles\\T_Proj_Rocket.png",
+   "world_size": 60
+  },
+  {
+   "columns": 2,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 2,
+     "fps": 12.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Proj_Acid",
+   "texture": "T_Proj_Acid",
+   "folder": "Projectiles",
+   "file": "SourceAssets\\Art\\Projectiles\\T_Proj_Acid.png",
+   "world_size": 60
+  },
+  {
+   "columns": 2,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 2,
+     "fps": 12.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Proj_Bolt",
+   "texture": "T_Proj_Bolt",
+   "folder": "Projectiles",
+   "file": "SourceAssets\\Art\\Projectiles\\T_Proj_Bolt.png",
+   "world_size": 60
+  },
+  {
+   "columns": 2,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 2,
+     "fps": 12.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Proj_Plasma",
+   "texture": "T_Proj_Plasma",
+   "folder": "Projectiles",
+   "file": "SourceAssets\\Art\\Projectiles\\T_Proj_Plasma.png",
+   "world_size": 60
+  },
+  {
+   "columns": 2,
+   "rows": 1,
+   "animations": {
+    "Play": {
+     "start": 0,
+     "count": 2,
+     "fps": 12.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Proj_Bullet",
+   "texture": "T_Proj_Bullet",
+   "folder": "Projectiles",
+   "file": "SourceAssets\\Art\\Projectiles\\T_Proj_Bullet.png",
+   "world_size": 60
+  },
+  {
+   "columns": 4,
+   "rows": 8,
+   "animations": {
+    "Money": {
+     "start": 0,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    },
+    "MoneyLarge": {
+     "start": 4,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    },
+    "Health": {
+     "start": 8,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    },
+    "Armor": {
+     "start": 12,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    },
+    "Ammo": {
+     "start": 16,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    },
+    "Key": {
+     "start": 20,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    },
+    "Weapon": {
+     "start": 24,
+     "count": 2,
+     "fps": 3.0,
+     "loop": true
+    },
+    "WeaponRare": {
+     "start": 26,
+     "count": 2,
+     "fps": 4.0,
+     "loop": true
+    },
+    "Perk": {
+     "start": 28,
+     "count": 4,
+     "fps": 6.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Pickups",
+   "texture": "T_Pickups",
+   "folder": "Pickups",
+   "file": "SourceAssets\\Art\\Pickups\\T_Pickups.png",
+   "world_size": 95
+  },
+  {
+   "columns": 4,
+   "rows": 3,
+   "animations": {
+    "DoorLocked": {
+     "start": 0,
+     "count": 1,
+     "fps": 2.0,
+     "loop": false
+    },
+    "DoorOpen": {
+     "start": 1,
+     "count": 1,
+     "fps": 2.0,
+     "loop": false
+    },
+    "Terminal": {
+     "start": 2,
+     "count": 2,
+     "fps": 2.0,
+     "loop": true
+    },
+    "ChestClosed": {
+     "start": 4,
+     "count": 1,
+     "fps": 2.0,
+     "loop": false
+    },
+    "ChestOpen": {
+     "start": 5,
+     "count": 1,
+     "fps": 2.0,
+     "loop": false
+    },
+    "ExitMarker": {
+     "start": 6,
+     "count": 2,
+     "fps": 3.0,
+     "loop": true
+    }
+   },
+   "name": "SS_Props",
+   "texture": "T_Props",
+   "folder": "Props",
+   "file": "SourceAssets\\Art\\Props\\T_Props.png",
+   "world_size": 160
+  }
+ ],
+ "textures": [
+  {
+   "name": "T_Floor_Office",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Floor_Office.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Wall_Office",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Wall_Office.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Obstacles_Office",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Obstacles_Office.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Floor_Industrial",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Floor_Industrial.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Wall_Industrial",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Wall_Industrial.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Obstacles_Industrial",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Obstacles_Industrial.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Floor_Lab",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Floor_Lab.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Wall_Lab",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Wall_Lab.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Obstacles_Lab",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Obstacles_Lab.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Decorations",
+   "folder": "Environment",
+   "file": "SourceAssets\\Art\\Environment\\T_Decorations.png",
+   "kind": "world"
+  },
+  {
+   "name": "T_Crosshair",
+   "folder": "UI",
+   "file": "SourceAssets\\Art\\UI\\T_Crosshair.png",
+   "kind": "ui"
+  },
+  {
+   "name": "T_Vignette",
+   "folder": "UI",
+   "file": "SourceAssets\\Art\\UI\\T_Vignette.png",
+   "kind": "ui_smooth"
+  },
+  {
+   "name": "T_TitleBackground",
+   "folder": "UI",
+   "file": "SourceAssets\\Art\\UI\\T_TitleBackground.png",
+   "kind": "ui"
+  }
+ ]
+}

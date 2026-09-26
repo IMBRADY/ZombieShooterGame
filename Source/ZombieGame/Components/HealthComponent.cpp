@@ -11,9 +11,15 @@ void UHealthComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Health = MaxHealth;
-	Armor = 0.0f;
-	bIsDead = false;
+	// A pawn whose health was already set before it began play (a restored checkpoint, a zombie
+	// initialised from its archetype) keeps it; everyone else starts full.
+	if (!bHealthInitialized)
+	{
+		Health = MaxHealth;
+		Armor = 0.0f;
+		bIsDead = false;
+		bHealthInitialized = true;
+	}
 }
 
 void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -60,6 +66,7 @@ float UHealthComponent::ApplyDamage(float DamageAmount)
 void UHealthComponent::SetMaxHealth(float NewMaxHealth, bool bRefill)
 {
 	MaxHealth = FMath::Max(NewMaxHealth, 1.0f);
+	bHealthInitialized = bHealthInitialized || bRefill;
 
 	const float OldHealth = Health;
 	Health = bRefill ? MaxHealth : FMath::Min(Health, MaxHealth);
@@ -102,5 +109,17 @@ void UHealthComponent::OnRep_Health()
 
 void UHealthComponent::OnRep_Armor()
 {
+	OnArmorChanged.Broadcast(Armor, MaxArmor);
+}
+
+void UHealthComponent::RestoreState(float InHealth, float InArmor)
+{
+	const float OldHealth = Health;
+	Health = FMath::Clamp(InHealth, 1.0f, MaxHealth);
+	Armor = FMath::Clamp(InArmor, 0.0f, MaxArmor);
+	bIsDead = false;
+	bHealthInitialized = true;
+
+	OnHealthChanged.Broadcast(Health, MaxHealth, Health - OldHealth);
 	OnArmorChanged.Broadcast(Armor, MaxArmor);
 }

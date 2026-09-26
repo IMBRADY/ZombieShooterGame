@@ -58,6 +58,12 @@ struct FSectorLayoutParams
 
 	/** Guards against pathological template sets; the build stops early rather than spinning. */
 	int32 MaxPlacementAttempts = 512;
+
+	/** Boss sectors end in a boss arena, which becomes the exit room. */
+	bool bRequireBossRoom = false;
+
+	/** Chance each optional-obstacle tile ('o') becomes real cover. */
+	float OptionalObstacleChance = 0.5f;
 };
 
 struct FSectorLayout
@@ -69,6 +75,9 @@ struct FSectorLayout
 
 	/** Room furthest from the start by door count - where the exit to the intermission goes. */
 	int32 ExitRoomIndex = INDEX_NONE;
+
+	/** The boss arena, on boss sectors that managed to fit one. */
+	int32 BossRoomIndex = INDEX_NONE;
 
 	FIntPoint MinCell = FIntPoint::ZeroValue;
 	FIntPoint MaxCell = FIntPoint::ZeroValue;
@@ -91,6 +100,12 @@ class ZOMBIEGAME_API FSectorLayoutBuilder
 public:
 	/** Builds a layout. Returns an empty layout if the candidate set cannot produce a valid one. */
 	static FSectorLayout Build(const FSectorLayoutParams& Params);
+
+	/**
+	 * A standalone single-room "layout" - the intermission shop. Nothing is connected; every
+	 * doorway stays sealed except the ones the caller turns into doors.
+	 */
+	static FSectorLayout BuildSingleRoom(const FSectorRoomCandidate& Candidate, int32 Seed);
 
 	/**
 	 * Re-checks the design's generation rules against a finished layout, independently of how it

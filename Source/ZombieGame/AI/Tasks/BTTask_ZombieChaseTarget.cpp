@@ -4,6 +4,7 @@
 #include "AI/ZombieFlowFieldSubsystem.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/Zombies/ZombieArchetypeDataAsset.h"
 #include "Characters/Zombies/ZombieCharacter.h"
 #include "Engine/World.h"
 
@@ -67,9 +68,12 @@ void UBTTask_ZombieChaseTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	}
 
 	// Arriving is the attack branch's cue; the in-range decorator normally interrupts this task
-	// first, but succeeding here keeps the tree correct if the service hasn't ticked yet.
-	const float Reach = Zombie->GetAttackRange();
-	if (FVector::DistSquared2D(Zombie->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(Reach))
+	// first, but succeeding here keeps the tree correct if the service hasn't ticked yet. Ranged
+	// zombies stop short, at the distance they prefer to fight from.
+	const UZombieArchetypeDataAsset* Archetype = Zombie->GetArchetype();
+	const bool bRanged = Archetype && Archetype->BehaviorProfile == EZombieBehaviorProfile::Ranged && Archetype->PreferredRange > 0.0f;
+	const float StopDistance = bRanged ? Archetype->PreferredRange * 0.9f : Zombie->GetAttackRange();
+	if (FVector::DistSquared2D(Zombie->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(StopDistance))
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;

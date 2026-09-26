@@ -46,3 +46,8 @@ CLAUDE.md
 ARCHITECTURE.md
 Zombie Video Game Sketch (3).pdf
 image.jpg
+
+# Content authoring report
+Content/Python/*_result.txt
+Content/Python/__pycache__/
+Tools/AssetGen/__pycache__/

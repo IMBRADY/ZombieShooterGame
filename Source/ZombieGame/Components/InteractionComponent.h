@@ -21,6 +21,12 @@ public:
 
 	AActor* GetFocusedInteractable() const { return FocusedInteractable; }
 
+	/** The focused interactable's prompt, or empty when nothing is in reach. */
+	FText GetFocusedPrompt() const;
+
+	/** Re-evaluates focus now rather than at the next check - after an interaction changes state. */
+	void RefreshFocus();
+
 	UPROPERTY(BlueprintAssignable)
 	FOnFocusedInteractableChanged OnFocusedInteractableChanged;
 

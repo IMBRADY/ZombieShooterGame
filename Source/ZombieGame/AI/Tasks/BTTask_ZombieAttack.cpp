@@ -62,6 +62,9 @@ EBTNodeResult::Type UBTTask_ZombieAttack::ExecuteTask(UBehaviorTreeComponent& Ow
 	Memory->ElapsedTime = 0.0f;
 	Memory->bDamageApplied = false;
 
+	const UZombieArchetypeDataAsset* Archetype = Zombie->GetArchetype();
+	Zombie->PlayActionAnimation(TEXT("Attack"), Archetype ? Archetype->AttackWindup + 0.25f : 0.6f);
+
 	return EBTNodeResult::InProgress;
 }
 

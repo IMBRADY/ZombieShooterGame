@@ -34,6 +34,13 @@ public:
 	void AddArmor(float Amount);
 	void Heal(float Amount);
 
+	/** Sets health and armor outright - restoring a saved run. Health is clamped to the maximum. */
+	void RestoreState(float InHealth, float InArmor);
+
+	float GetHealthFraction() const { return MaxHealth > 0.0f ? Health / MaxHealth : 0.0f; }
+	bool IsFullHealth() const { return Health >= MaxHealth; }
+	bool IsFullArmor() const { return Armor >= MaxArmor; }
+
 	UPROPERTY(BlueprintAssignable)
 	FOnHealthChanged OnHealthChanged;
 
@@ -66,4 +73,5 @@ protected:
 
 private:
 	bool bIsDead = false;
+	bool bHealthInitialized = false;
 };

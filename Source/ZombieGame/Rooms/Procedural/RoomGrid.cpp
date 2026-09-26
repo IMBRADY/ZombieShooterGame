@@ -12,6 +12,7 @@ namespace RoomTile
 		case ERoomTile::Obstacle:		return TEXT('O');
 		case ERoomTile::ZombieSpawn:	return TEXT('S');
 		case ERoomTile::PlayerStart:	return TEXT('P');
+		case ERoomTile::OptionalObstacle: return TEXT('o');
 		default:						return TEXT(' ');
 		}
 	}
@@ -26,6 +27,7 @@ namespace RoomTile
 		case TEXT('O'):	OutTile = ERoomTile::Obstacle;		return true;
 		case TEXT('S'):	OutTile = ERoomTile::ZombieSpawn;	return true;
 		case TEXT('P'):	OutTile = ERoomTile::PlayerStart;	return true;
+		case TEXT('o'):	OutTile = ERoomTile::OptionalObstacle;	return true;
 		case TEXT(' '):
 		case TEXT('_'):	OutTile = ERoomTile::Empty;			return true;
 		default:									 		return false;
@@ -141,6 +143,25 @@ bool FRoomGrid::RebuildDerivedData(FString& OutError)
 	}
 
 	return true;
+}
+
+void FRoomGrid::ResolveOptionalTiles(FRandomStream& Random, float ObstacleChance)
+{
+	bool bChanged = false;
+	for (ERoomTile& Tile : Tiles)
+	{
+		if (Tile == ERoomTile::OptionalObstacle)
+		{
+			Tile = Random.FRand() < ObstacleChance ? ERoomTile::Obstacle : ERoomTile::Floor;
+			bChanged = true;
+		}
+	}
+
+	if (bChanged)
+	{
+		FString UnusedError;
+		RebuildDerivedData(UnusedError);
+	}
 }
 
 FRoomGrid FRoomGrid::Rotated(int32 QuarterTurns) const

@@ -1,13 +1,15 @@
 #include "ZombieAIAssetSubsystem.h"
 #include "AI/Blackboard/ZombieBlackboardKeys.h"
-#include "AI/ZombieAISettings.h"
 #include "AI/Decorators/BTDecorator_ZombieBlackboardKeySet.h"
 #include "AI/Services/BTService_ZombieCombatState.h"
 #include "AI/Tasks/BTTask_ZombieAttack.h"
 #include "AI/Tasks/BTTask_ZombieChaseTarget.h"
 #include "AI/Tasks/BTTask_ZombieClearBlackboardValue.h"
 #include "AI/Tasks/BTTask_ZombieFindRoamLocation.h"
+#include "AI/Tasks/BTTask_ZombieKeepDistance.h"
 #include "AI/Tasks/BTTask_ZombieMoveTo.h"
+#include "AI/Tasks/BTTask_ZombieUseAbility.h"
+#include "AI/ZombieAISettings.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Bool.h"
@@ -16,7 +18,6 @@
 #include "BehaviorTree/Composites/BTComposite_Selector.h"
 #include "BehaviorTree/Composites/BTComposite_Sequence.h"
 #include "BehaviorTree/Tasks/BTTask_Wait.h"
-#include "Characters/Zombies/ZombieArchetypeDataAsset.h"
 #include "ZombieGame.h"
 
 namespace
@@ -49,9 +50,15 @@ namespace
 		}
 	}
 
+	template <typename TNode>
+	TNode* MakeNode(UObject& Outer, const TCHAR* NodeId)
+	{
+		return NewObject<TNode>(&Outer, TNode::StaticClass(), FName(NodeId));
+	}
+
 	UBTTask_Wait* MakeWaitTask(UBehaviorTree& Tree, const TCHAR* NodeId, float Seconds, float Deviation)
 	{
-		UBTTask_Wait* Wait = NewObject<UBTTask_Wait>(&Tree, UBTTask_Wait::StaticClass(), FName(NodeId));
+		UBTTask_Wait* Wait = MakeNode<UBTTask_Wait>(Tree, NodeId);
 		Wait->WaitTime = Seconds;
 		Wait->RandomDeviation = Deviation;
 		return Wait;
@@ -60,10 +67,21 @@ namespace
 	UBTDecorator_ZombieBlackboardKeySet* MakeKeySetDecorator(UBehaviorTree& Tree, const TCHAR* NodeId,
 		FName KeyName, EBTFlowAbortMode::Type AbortMode)
 	{
-		UBTDecorator_ZombieBlackboardKeySet* Decorator =
-			NewObject<UBTDecorator_ZombieBlackboardKeySet>(&Tree, UBTDecorator_ZombieBlackboardKeySet::StaticClass(), FName(NodeId));
+		UBTDecorator_ZombieBlackboardKeySet* Decorator = MakeNode<UBTDecorator_ZombieBlackboardKeySet>(Tree, NodeId);
 		Decorator->Configure(KeyName, /*bRequireUnset=*/false, AbortMode);
 		return Decorator;
+	}
+
+	/** Fires an ability the moment one is ready, interrupting whatever lower-priority branch runs. */
+	void AttachAbilityUse(UBehaviorTree& Tree, UBTCompositeNode& Combat)
+	{
+		UBTTask_ZombieUseAbility* UseAbility = MakeNode<UBTTask_ZombieUseAbility>(Tree, TEXT("Task_UseAbility"));
+		UseAbility->Configure(ZombieBlackboardKeys::TargetActor);
+
+		// LowerPriority only: the ability's own cooldown flips AbilityReady off the moment it fires,
+		// and aborting Self on that would cancel the wind-up it just started.
+		AttachTask(Combat, UseAbility,
+			MakeKeySetDecorator(Tree, TEXT("Dec_AbilityReady"), ZombieBlackboardKeys::AbilityReady, EBTFlowAbortMode::LowerPriority));
 	}
 }
 
@@ -80,16 +98,21 @@ UBlackboardData* UZombieAIAssetSubsystem::GetOrBuildBlackboard()
 	AddBlackboardKey(*SharedBlackboard, ZombieBlackboardKeys::InvestigateLocation, UBlackboardKeyType_Vector::StaticClass());
 	AddBlackboardKey(*SharedBlackboard, ZombieBlackboardKeys::RoamLocation, UBlackboardKeyType_Vector::StaticClass());
 	AddBlackboardKey(*SharedBlackboard, ZombieBlackboardKeys::InAttackRange, UBlackboardKeyType_Bool::StaticClass());
+	AddBlackboardKey(*SharedBlackboard, ZombieBlackboardKeys::AbilityReady, UBlackboardKeyType_Bool::StaticClass());
+	AddBlackboardKey(*SharedBlackboard, ZombieBlackboardKeys::TooClose, UBlackboardKeyType_Bool::StaticClass());
+	AddBlackboardKey(*SharedBlackboard, ZombieBlackboardKeys::InPreferredRange, UBlackboardKeyType_Bool::StaticClass());
 
 	return SharedBlackboard;
 }
 
-UBTCompositeNode* UZombieAIAssetSubsystem::BuildCombatBranch(UBehaviorTree& Tree) const
+UBTCompositeNode* UZombieAIAssetSubsystem::BuildMeleeCombatBranch(UBehaviorTree& Tree) const
 {
-	UBTComposite_Selector* Combat = NewObject<UBTComposite_Selector>(&Tree, UBTComposite_Selector::StaticClass(), TEXT("Sel_Combat"));
-	Combat->NodeName = TEXT("Combat");
+	UBTComposite_Selector* Combat = MakeNode<UBTComposite_Selector>(Tree, TEXT("Sel_Combat"));
+	Combat->NodeName = TEXT("Combat (Melee)");
 
-	UBTTask_ZombieAttack* Attack = NewObject<UBTTask_ZombieAttack>(&Tree, UBTTask_ZombieAttack::StaticClass(), TEXT("Task_Attack"));
+	AttachAbilityUse(Tree, *Combat);
+
+	UBTTask_ZombieAttack* Attack = MakeNode<UBTTask_ZombieAttack>(Tree, TEXT("Task_Attack"));
 	Attack->Configure(ZombieBlackboardKeys::TargetActor);
 
 	// Both: interrupt the chase the moment the target is in reach, and abandon the swing if it
@@ -98,11 +121,33 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildCombatBranch(UBehaviorTree& Tree
 		MakeKeySetDecorator(Tree, TEXT("Dec_InAttackRange"), ZombieBlackboardKeys::InAttackRange, EBTFlowAbortMode::Both));
 
 	// Chasing goes through the horde's shared flow field rather than a per-zombie MoveTo - see
-	// UZombieFlowFieldSubsystem for why. Investigating and roaming still use real navigation
-	// queries: those are one-off, infrequent, and go somewhere the field knows nothing about.
-	UBTTask_ZombieChaseTarget* Chase = NewObject<UBTTask_ZombieChaseTarget>(&Tree, UBTTask_ZombieChaseTarget::StaticClass(), TEXT("Task_Chase"));
+	// UZombieFlowFieldSubsystem for why.
+	UBTTask_ZombieChaseTarget* Chase = MakeNode<UBTTask_ZombieChaseTarget>(Tree, TEXT("Task_Chase"));
 	Chase->Configure(ZombieBlackboardKeys::TargetActor);
 	AttachTask(*Combat, Chase);
+
+	return Combat;
+}
+
+UBTCompositeNode* UZombieAIAssetSubsystem::BuildRangedCombatBranch(UBehaviorTree& Tree) const
+{
+	UBTComposite_Selector* Combat = MakeNode<UBTComposite_Selector>(Tree, TEXT("Sel_RangedCombat"));
+	Combat->NodeName = TEXT("Combat (Ranged)");
+
+	AttachAbilityUse(Tree, *Combat);
+
+	UBTTask_ZombieKeepDistance* KeepDistance = MakeNode<UBTTask_ZombieKeepDistance>(Tree, TEXT("Task_KeepDistance"));
+	KeepDistance->Configure(ZombieBlackboardKeys::TargetActor, 1.4f);
+	AttachTask(*Combat, KeepDistance,
+		MakeKeySetDecorator(Tree, TEXT("Dec_TooClose"), ZombieBlackboardKeys::TooClose, EBTFlowAbortMode::LowerPriority));
+
+	// At range with nothing ready: hold position briefly, re-evaluating as soon as range changes.
+	AttachTask(*Combat, MakeWaitTask(Tree, TEXT("Task_HoldRange"), 0.4f, 0.15f),
+		MakeKeySetDecorator(Tree, TEXT("Dec_InPreferredRange"), ZombieBlackboardKeys::InPreferredRange, EBTFlowAbortMode::Both));
+
+	UBTTask_ZombieChaseTarget* Approach = MakeNode<UBTTask_ZombieChaseTarget>(Tree, TEXT("Task_Approach"));
+	Approach->Configure(ZombieBlackboardKeys::TargetActor);
+	AttachTask(*Combat, Approach);
 
 	return Combat;
 }
@@ -111,17 +156,16 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildInvestigateBranch(UBehaviorTree&
 {
 	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
 
-	UBTComposite_Sequence* Investigate = NewObject<UBTComposite_Sequence>(&Tree, UBTComposite_Sequence::StaticClass(), TEXT("Seq_Investigate"));
+	UBTComposite_Sequence* Investigate = MakeNode<UBTComposite_Sequence>(Tree, TEXT("Seq_Investigate"));
 	Investigate->NodeName = TEXT("Investigate Noise");
 
-	UBTTask_ZombieMoveTo* MoveToNoise = NewObject<UBTTask_ZombieMoveTo>(&Tree, UBTTask_ZombieMoveTo::StaticClass(), TEXT("Task_MoveToNoise"));
+	UBTTask_ZombieMoveTo* MoveToNoise = MakeNode<UBTTask_ZombieMoveTo>(Tree, TEXT("Task_MoveToNoise"));
 	MoveToNoise->Configure(ZombieBlackboardKeys::InvestigateLocation, /*AcceptableRadius=*/100.0f, /*bChaseMovingGoal=*/false);
 	AttachTask(*Investigate, MoveToNoise);
 
 	AttachTask(*Investigate, MakeWaitTask(Tree, TEXT("Task_LookAround"), Settings->InvestigateLookAroundTime, 0.5f));
 
-	UBTTask_ZombieClearBlackboardValue* Forget =
-		NewObject<UBTTask_ZombieClearBlackboardValue>(&Tree, UBTTask_ZombieClearBlackboardValue::StaticClass(), TEXT("Task_ForgetNoise"));
+	UBTTask_ZombieClearBlackboardValue* Forget = MakeNode<UBTTask_ZombieClearBlackboardValue>(Tree, TEXT("Task_ForgetNoise"));
 	Forget->Configure(ZombieBlackboardKeys::InvestigateLocation);
 	AttachTask(*Investigate, Forget);
 
@@ -132,18 +176,16 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildRoamBranch(UBehaviorTree& Tree) 
 {
 	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
 
-	UBTComposite_Sequence* Roam = NewObject<UBTComposite_Sequence>(&Tree, UBTComposite_Sequence::StaticClass(), TEXT("Seq_Roam"));
+	UBTComposite_Sequence* Roam = MakeNode<UBTComposite_Sequence>(Tree, TEXT("Seq_Roam"));
 	Roam->NodeName = TEXT("Roam");
 
 	// Short hops with a short pause after each, rather than long treks: a zombie that has not seen
-	// anything should read as milling around its patch, and it keeps them spread through the rooms
-	// they were spawned in instead of draining toward one corner of the sector.
-	UBTTask_ZombieFindRoamLocation* FindRoamLocation =
-		NewObject<UBTTask_ZombieFindRoamLocation>(&Tree, UBTTask_ZombieFindRoamLocation::StaticClass(), TEXT("Task_FindRoamLocation"));
+	// anything should read as milling around its patch.
+	UBTTask_ZombieFindRoamLocation* FindRoamLocation = MakeNode<UBTTask_ZombieFindRoamLocation>(Tree, TEXT("Task_FindRoamLocation"));
 	FindRoamLocation->Configure(ZombieBlackboardKeys::RoamLocation, Settings->RoamRadius);
 	AttachTask(*Roam, FindRoamLocation);
 
-	UBTTask_ZombieMoveTo* MoveToRoamLocation = NewObject<UBTTask_ZombieMoveTo>(&Tree, UBTTask_ZombieMoveTo::StaticClass(), TEXT("Task_Wander"));
+	UBTTask_ZombieMoveTo* MoveToRoamLocation = MakeNode<UBTTask_ZombieMoveTo>(Tree, TEXT("Task_Wander"));
 	MoveToRoamLocation->Configure(ZombieBlackboardKeys::RoamLocation, /*AcceptableRadius=*/60.0f, /*bChaseMovingGoal=*/false);
 	AttachTask(*Roam, MoveToRoamLocation);
 
@@ -152,39 +194,45 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildRoamBranch(UBehaviorTree& Tree) 
 	return Roam;
 }
 
-UBehaviorTree* UZombieAIAssetSubsystem::GetOrBuildSharedTree()
+UBehaviorTree* UZombieAIAssetSubsystem::GetOrBuildTree(EZombieBehaviorProfile Profile)
 {
-	if (SharedBehaviorTree)
+	if (TObjectPtr<UBehaviorTree>* Existing = Trees.Find(Profile))
 	{
-		return SharedBehaviorTree;
+		return *Existing;
 	}
 
-	SharedBehaviorTree = NewObject<UBehaviorTree>(this, TEXT("BT_Zombie"));
-	SharedBehaviorTree->BlackboardAsset = GetOrBuildBlackboard();
+	const bool bBoss = Profile == EZombieBehaviorProfile::Boss;
+	const TCHAR* TreeName = bBoss ? TEXT("BT_ZombieBoss") : Profile == EZombieBehaviorProfile::Ranged ? TEXT("BT_ZombieRanged") : TEXT("BT_ZombieMelee");
+
+	UBehaviorTree* Tree = NewObject<UBehaviorTree>(this, FName(TreeName));
+	Tree->BlackboardAsset = GetOrBuildBlackboard();
 
 	// Priority order is the whole design: a seen target beats a heard noise, which beats idling.
-	UBTComposite_Selector* Root = NewObject<UBTComposite_Selector>(SharedBehaviorTree, UBTComposite_Selector::StaticClass(), TEXT("Sel_Root"));
+	UBTComposite_Selector* Root = MakeNode<UBTComposite_Selector>(*Tree, TEXT("Sel_Root"));
 	Root->NodeName = TEXT("Zombie Root");
 
-	UBTService_ZombieCombatState* CombatState =
-		NewObject<UBTService_ZombieCombatState>(SharedBehaviorTree, UBTService_ZombieCombatState::StaticClass(), TEXT("Svc_CombatState"));
-	CombatState->Configure(ZombieBlackboardKeys::TargetActor, ZombieBlackboardKeys::InAttackRange, 0.15f);
+	UBTService_ZombieCombatState* CombatState = MakeNode<UBTService_ZombieCombatState>(*Tree, TEXT("Svc_CombatState"));
+	CombatState->Configure(ZombieBlackboardKeys::TargetActor, ZombieBlackboardKeys::InAttackRange, 0.15f, /*bAlwaysHunt=*/bBoss);
 	Root->Services.Add(CombatState);
 
-	AttachComposite(*Root, BuildCombatBranch(*SharedBehaviorTree),
-		MakeKeySetDecorator(*SharedBehaviorTree, TEXT("Dec_HasTarget"), ZombieBlackboardKeys::TargetActor, EBTFlowAbortMode::LowerPriority));
+	UBTCompositeNode* Combat = Profile == EZombieBehaviorProfile::Ranged ? BuildRangedCombatBranch(*Tree) : BuildMeleeCombatBranch(*Tree);
+	AttachComposite(*Root, Combat,
+		MakeKeySetDecorator(*Tree, TEXT("Dec_HasTarget"), ZombieBlackboardKeys::TargetActor, EBTFlowAbortMode::LowerPriority));
 
-	AttachComposite(*Root, BuildInvestigateBranch(*SharedBehaviorTree),
-		MakeKeySetDecorator(*SharedBehaviorTree, TEXT("Dec_HasNoise"), ZombieBlackboardKeys::InvestigateLocation, EBTFlowAbortMode::LowerPriority));
+	// Bosses never idle or investigate - the service always hands them a target while a player lives.
+	if (!bBoss)
+	{
+		AttachComposite(*Root, BuildInvestigateBranch(*Tree),
+			MakeKeySetDecorator(*Tree, TEXT("Dec_HasNoise"), ZombieBlackboardKeys::InvestigateLocation, EBTFlowAbortMode::LowerPriority));
+	}
+	AttachComposite(*Root, BuildRoamBranch(*Tree), nullptr);
 
-	AttachComposite(*Root, BuildRoamBranch(*SharedBehaviorTree), nullptr);
+	Tree->RootNode = Root;
+	Trees.Add(Profile, Tree);
 
-	SharedBehaviorTree->RootNode = Root;
-
-	UE_LOG(LogZombieGame, Log, TEXT("Zombie behavior tree assembled in code: %d root branches, %d blackboard keys."),
-		Root->Children.Num(), SharedBlackboard->Keys.Num());
-
-	return SharedBehaviorTree;
+	UE_LOG(LogZombieGame, Log, TEXT("Behavior tree '%s' assembled in code: %d root branches, %d blackboard keys."),
+		TreeName, Root->Children.Num(), SharedBlackboard->Keys.Num());
+	return Tree;
 }
 
 UBehaviorTree* UZombieAIAssetSubsystem::GetBehaviorTreeFor(const UZombieArchetypeDataAsset* Archetype)
@@ -194,5 +242,5 @@ UBehaviorTree* UZombieAIAssetSubsystem::GetBehaviorTreeFor(const UZombieArchetyp
 		return Archetype->BehaviorTreeOverride;
 	}
 
-	return GetOrBuildSharedTree();
+	return GetOrBuildTree(Archetype ? Archetype->BehaviorProfile : EZombieBehaviorProfile::Melee);
 }

@@ -6,14 +6,16 @@
 #include "RoomModule.generated.h"
 
 class UInstancedStaticMeshComponent;
-class UStaticMesh;
+class UPointLightComponent;
+class URoomThemeDataAsset;
 
 /**
  * The in-world realisation of one handcrafted room module.
  *
  * It only stamps out the tiles a designer authored in the module's Room Template Data Asset - it
- * never invents layout. Repeated floor/wall/obstacle pieces go through Instanced Static Mesh
- * components so a whole sector costs a handful of draw calls (ARCHITECTURE.md 8).
+ * never invents layout. Repeated floor/wall/obstacle/debris pieces go through Instanced Static
+ * Mesh components so a whole sector costs a handful of draw calls (ARCHITECTURE.md 8); the
+ * sector's theme supplies their materials, and the per-room seed decides decoration and props.
  */
 UCLASS()
 class ZOMBIEGAME_API ARoomModule : public AActor
@@ -26,8 +28,9 @@ public:
 	/**
 	 * Builds this module's geometry from a placement produced by FSectorLayoutBuilder. Doorways
 	 * the layout actually connected are left open; the rest are sealed back up as wall.
+	 * Call between SpawnActorDeferred and FinishSpawning.
 	 */
-	void BuildFromPlacement(const FSectorRoomPlacement& Placement, float InTileSize);
+	void BuildFromPlacement(const FSectorRoomPlacement& Placement, float InTileSize, const URoomThemeDataAsset* Theme, int32 DecorationSeed);
 
 	/** World-space points a zombie may be spawned at, from the module's 'S' tiles. */
 	const TArray<FVector>& GetZombieSpawnLocations() const { return ZombieSpawnLocations; }
@@ -35,25 +38,27 @@ public:
 	/** World-space point the player starts at, from the module's 'P' tile. */
 	bool GetPlayerStartLocation(FVector& OutLocation) const;
 
+	/** Doorways that were sealed, as transforms at the doorway facing into the room - exit door slots. */
+	const TArray<FTransform>& GetSealedDoorways() const { return SealedDoorways; }
+
+	/** An open floor tile near the middle of the room, at pawn height. */
+	FVector GetCentreLocation() const { return CentreLocation; }
+
 	/** World-space bounds of the module's footprint, including wall thickness. */
 	FBox GetWorldBounds() const { return WorldBounds; }
 
 	ERoomType GetRoomType() const { return RoomType; }
 
+	float GetWallHeight() const { return WallHeight; }
+
 protected:
 	virtual void BeginPlay() override;
 
-	UPROPERTY(VisibleAnywhere, Category = "Room")
-	TObjectPtr<USceneComponent> SceneRoot;
-
-	UPROPERTY(VisibleAnywhere, Category = "Room")
-	TObjectPtr<UInstancedStaticMeshComponent> FloorMeshes;
-
-	UPROPERTY(VisibleAnywhere, Category = "Room")
-	TObjectPtr<UInstancedStaticMeshComponent> WallMeshes;
-
-	UPROPERTY(VisibleAnywhere, Category = "Room")
-	TObjectPtr<UInstancedStaticMeshComponent> ObstacleMeshes;
+	UPROPERTY(VisibleAnywhere, Category = "Room") TObjectPtr<USceneComponent> SceneRoot;
+	UPROPERTY(VisibleAnywhere, Category = "Room") TObjectPtr<UInstancedStaticMeshComponent> FloorMeshes;
+	UPROPERTY(VisibleAnywhere, Category = "Room") TObjectPtr<UInstancedStaticMeshComponent> WallMeshes;
+	UPROPERTY(VisibleAnywhere, Category = "Room") TObjectPtr<UInstancedStaticMeshComponent> ObstacleMeshes;
+	UPROPERTY(VisibleAnywhere, Category = "Room") TObjectPtr<UInstancedStaticMeshComponent> DecorationMeshes;
 
 	/** Height of a wall tile. Also the ceiling clearance the top-down camera looks past. */
 	UPROPERTY(EditDefaultsOnly, Category = "Room")
@@ -62,26 +67,39 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Room")
 	float FloorThickness = 24.0f;
 
-	/** Obstacles are waist-high cover, not full walls - they block movement, not sight lines. */
+	/** Obstacles are waist-high cover, not full walls - they block movement and bullets, not sight lines. */
 	UPROPERTY(EditDefaultsOnly, Category = "Room")
 	float ObstacleHeight = 120.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Room")
-	float ObstacleFootprintRatio = 0.7f;
+	float ObstacleFootprintRatio = 0.72f;
 
 	/** Vertical offset applied to spawn/start points so pawns are placed above the floor. */
 	UPROPERTY(EditDefaultsOnly, Category = "Room")
 	float PawnSpawnHeight = 100.0f;
 
 private:
-	void AddTileInstance(UInstancedStaticMeshComponent* Component, const FIntPoint& Cell, float Height, float ZCentre, float FootprintRatio);
+	void AddTileInstance(UInstancedStaticMeshComponent* Component, const FIntPoint& Cell, float Height, float ZCentre,
+		float FootprintRatio, float Variant = -1.0f, float YawDegrees = 0.0f);
+	void ApplyTheme(const URoomThemeDataAsset* Theme);
+	void AddLight(const URoomThemeDataAsset& Theme, FRandomStream& Random);
+	void RecordSealedDoorway(const FRoomGrid& Grid, int32 DoorwayIndex);
+	void Flicker();
 
 	FVector GetTileCentre(const FIntPoint& Cell) const;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UPointLightComponent> RoomLight;
+
 	TArray<FVector> ZombieSpawnLocations;
 	TArray<FVector> PlayerStartLocations;
+	TArray<FTransform> SealedDoorways;
+	FVector CentreLocation = FVector::ZeroVector;
 
 	FBox WorldBounds = FBox(ForceInit);
 	float TileSize = 250.0f;
+	float BaseLightIntensity = 0.0f;
+	bool bFlickers = false;
 	ERoomType RoomType = ERoomType::Combat;
+	FTimerHandle FlickerTimer;
 };

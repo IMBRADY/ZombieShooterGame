@@ -23,7 +23,11 @@ public class ZombieGame : ModuleRules
 			"GameplayTasks",
 			"GameplayTags",
 			"UMG",
-			"Niagara"
+			"Slate",
+			"SlateCore",
+			"Niagara",
+			"OnlineSubsystem",
+			"OnlineSubsystemUtils"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
