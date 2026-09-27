@@ -153,7 +153,7 @@ bool UShopTransactionComponent::ExecuteOffer(int32 OfferId, FText& OutMessage)
 	Weapon.Weapon = Offer->Weapon;
 
 	UInventoryComponent* Inventory = Pawn->FindComponentByClass<UInventoryComponent>();
-	const AZombieWeapon* Traded = (Inventory && !Inventory->HasFreeSlot()) ? Inventory->GetActiveWeapon() : nullptr;
+	const AZombieWeapon* Traded = (Inventory && !Inventory->HasFreeSlot()) ? Inventory->GetActiveGun() : nullptr;
 	const int32 TradeValue = Traded ? FShopPricing::GetSellPrice(*Traded) : 0;
 
 	FText Description;

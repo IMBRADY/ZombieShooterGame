@@ -4,6 +4,9 @@
 #include "GameFramework/CheatManager.h"
 #include "ZombieCheatManager.generated.h"
 
+class AZombieCharacter;
+enum class EZombieClassTier : uint8;
+
 /**
  * Development console commands (never in shipping builds - Unreal strips the cheat manager).
  *
@@ -12,6 +15,9 @@
  * each step, so the full game loop can be verified headlessly:
  *
  *     UnrealEditor.exe ZombieGame.uproject /Game/Maps/L_TestSector -game -nullrhi -ExecCmds="ZombieSmokeTest 6"
+ *
+ * ZombieMeleeTest (also run at the start of the smoke test) checks the melee slot: a shambler
+ * dies to one stab, a tougher zombie survives one, and nothing needs ammo. Logs PASS / FAIL.
  */
 UCLASS()
 class ZOMBIEGAME_API UZombieCheatManager : public UCheatManager
@@ -24,6 +30,7 @@ public:
 	UFUNCTION(Exec) void ZombieGiveMoney(int32 Amount);
 	UFUNCTION(Exec) void ZombieCollectKey();
 	UFUNCTION(Exec) void ZombieSmokeTest(int32 TargetSector);
+	UFUNCTION(Exec) void ZombieMeleeTest();
 
 private:
 	void SmokeTestStep();
@@ -31,6 +38,16 @@ private:
 	void SmokeTestFinish();
 	void OnSmokeTestTransaction(bool bSuccess, const FText& Message);
 	APawn* GetPlayerPawn() const;
+
+	/** Spawns a reward-less zombie of the given class right in front of the player. */
+	AZombieCharacter* SpawnMeleeTestZombie(EZombieClassTier Tier) const;
+
+	/** Draws the melee weapon and swings it once; true if a swing actually happened. */
+	bool SwingMelee() const;
+
+	void MeleeTestSecondStab();
+
+	TWeakObjectPtr<AZombieCharacter> MeleeTestTarget;
 
 	FTimerHandle SmokeTestTimer;
 	int32 SmokeTestTarget = 0;

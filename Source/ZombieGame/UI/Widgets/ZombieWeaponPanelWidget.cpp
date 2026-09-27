@@ -129,6 +129,18 @@ void UZombieWeaponPanelWidget::RefreshWeaponInfo()
 		return;
 	}
 
+	if (!Definition->bUsesAmmo)
+	{
+		WeaponName->SetText(FText::Format(LOCTEXT("MeleeName", "{0}  [MELEE]"), Definition->DisplayName));
+		WeaponName->SetColorAndOpacity(FSlateColor(ZombieUI::TextColor));
+		AmmoText->SetText(LOCTEXT("NoAmmoNeeded", "--"));
+		AmmoText->SetColorAndOpacity(FSlateColor(ZombieUI::TextColor));
+		ReserveText->SetText(FText::GetEmpty());
+		StatusText->SetText(FText::GetEmpty());
+		ReloadBar->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
+
 	const FWeaponRarityTier Tier = UWeaponRaritySettings::GetOrLoadDefault()->GetTier(Weapon->GetRarity());
 	const FText Name = Weapon->IsUpgraded()
 		? FText::Format(LOCTEXT("UpgradedName", "{0}+"), Definition->DisplayName)
@@ -142,6 +154,12 @@ void UZombieWeaponPanelWidget::RefreshWeaponInfo()
 
 void UZombieWeaponPanelWidget::HandleAmmoChanged(int32 AmmoInMagazine, int32 ReserveAmmo)
 {
+	const AZombieWeapon* Drawn = BoundWeapon.Get();
+	if (Drawn && Drawn->GetDefinition() && !Drawn->GetDefinition()->bUsesAmmo)
+	{
+		return;
+	}
+
 	AmmoText->SetText(FText::AsNumber(AmmoInMagazine));
 	AmmoText->SetColorAndOpacity(FSlateColor(AmmoInMagazine > 0 ? ZombieUI::TextColor : ZombieUI::Danger));
 	ReserveText->SetText(FText::Format(LOCTEXT("Reserve", "/ {0}"), FText::AsNumber(ReserveAmmo)));
@@ -190,7 +208,7 @@ void UZombieWeaponPanelWidget::RebuildSlots()
 	{
 		const AZombieWeapon* Weapon = Inventory->GetWeaponAt(SlotIndex);
 		const UWeaponDataAsset* Definition = Weapon ? Weapon->GetDefinition() : nullptr;
-		const bool bActive = SlotIndex == Inventory->GetActiveIndex() && Weapon;
+		const bool bActive = SlotIndex == Inventory->GetActiveIndex() && Weapon && !Inventory->IsMeleeActive();
 
 		const FText Label = FText::Format(LOCTEXT("Slot", "{0} {1}"), FText::AsNumber(SlotIndex + 1),
 			Definition ? Definition->DisplayName : LOCTEXT("EmptySlot", "--"));
@@ -201,6 +219,16 @@ void UZombieWeaponPanelWidget::RebuildSlots()
 		UBorder* Box = ZombieUI::MakePanel(*WidgetTree, Text, FMargin(8.0f, 4.0f),
 			bActive ? FLinearColor(0.25f, 0.4f, 0.12f, 0.95f) : FLinearColor(0.0f, 0.0f, 0.0f, 0.6f));
 		SlotRow->AddChildToHorizontalBox(Box)->SetPadding(FMargin(4.0f, 0.0f, 0.0f, 0.0f));
+	}
+
+	if (const AZombieWeapon* Melee = Inventory->GetMeleeWeapon())
+	{
+		const UWeaponDataAsset* Definition = Melee->GetDefinition();
+		const FText Label = FText::Format(LOCTEXT("MeleeSlot", "V {0}"), Definition ? Definition->DisplayName : LOCTEXT("MeleeFallback", "MELEE"));
+		UTextBlock* Text = ZombieUI::MakeText(*WidgetTree, Label, 11, ZombieUI::TextColor);
+		UBorder* Box = ZombieUI::MakePanel(*WidgetTree, Text, FMargin(8.0f, 4.0f),
+			Inventory->IsMeleeActive() ? FLinearColor(0.25f, 0.4f, 0.12f, 0.95f) : FLinearColor(0.0f, 0.0f, 0.0f, 0.6f));
+		SlotRow->AddChildToHorizontalBox(Box)->SetPadding(FMargin(12.0f, 0.0f, 0.0f, 0.0f));
 	}
 }
 

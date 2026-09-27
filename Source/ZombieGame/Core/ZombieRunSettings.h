@@ -30,6 +30,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Start", meta = (ClampMin = "0"))
 	int32 StartingMoney = 0;
 
+	/**
+	 * The melee weapon every player always carries in its own slot, apart from the gun slots: it
+	 * can't be sold, traded or dropped, and it never needs ammo - the answer to an unlucky run
+	 * that leaves every gun dry.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Start")
+	TObjectPtr<UWeaponDataAsset> MeleeWeapon;
+
 	/** "Boss sectors every 5 sectors." */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bosses", meta = (ClampMin = "1"))
 	int32 BossSectorInterval = 5;

@@ -132,6 +132,7 @@ void AZombiePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	Input->BindAction(InputConfig->Interact, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleInteract);
 	Input->BindAction(InputConfig->WeaponSlot, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleWeaponSlot);
 	Input->BindAction(InputConfig->CycleWeapon, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleCycleWeapon);
+	Input->BindAction(InputConfig->Melee, ETriggerEvent::Started, this, &AZombiePlayerCharacter::HandleMelee);
 }
 
 void AZombiePlayerCharacter::OnPlayerStateChanged(APlayerState* NewPlayerState, APlayerState* OldPlayerState)
@@ -233,8 +234,13 @@ void AZombiePlayerCharacter::UpdateMouseAim()
 		return;
 	}
 
-	// Aim on the plane of the character's own height, so the gun points exactly at the cursor.
-	const float T = (GetActorLocation().Z - WorldLocation.Z) / WorldDirection.Z;
+	// Resolve the cursor on the plane the sprites and tracers are drawn on, not at capsule-centre
+	// height. The camera looks down at an angle, so the two planes put the same screen point ~20
+	// units apart on the ground: aiming on the higher one made every tracer land slightly beside
+	// the crosshair, by an amount that changed with the aim direction.
+	const float AimPlaneZ = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
+		+ AZombieWeapon::VisualShotHeightAboveFeet;
+	const float T = (AimPlaneZ - WorldLocation.Z) / WorldDirection.Z;
 	AimPoint = WorldLocation + WorldDirection * T;
 	ApplyFacing(AimPoint - GetActorLocation());
 }
@@ -299,6 +305,14 @@ void AZombiePlayerCharacter::HandleWeaponSlot(const FInputActionValue& Value)
 	if (!bInputBlocked && SlotNumber >= 1)
 	{
 		WeaponComponent->SelectSlot(SlotNumber - 1);
+	}
+}
+
+void AZombiePlayerCharacter::HandleMelee(const FInputActionValue& Value)
+{
+	if (!bInputBlocked)
+	{
+		WeaponComponent->SelectMelee();
 	}
 }
 

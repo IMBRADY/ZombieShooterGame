@@ -5,6 +5,47 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Crosshair alignment, the New Run freeze, and a shank in its own melee slot
+
+Second playtest report (prompt.txt), item by item.
+
+- **Bullet path not lining up with the crosshair.** Mouse aim deprojected the cursor onto a plane at
+  capsule-centre height, but tracers (since the previous fix) are drawn on the sprite plane, ~72 units
+  lower. Under the -75° camera those two planes put the same screen point ~19 units apart on the
+  ground. So every tracer ran slightly beside the cursor, by an amount that changed with the aim
+  direction. The cursor is now resolved on the same plane the sprites and tracers are drawn on
+  (`AZombiePlayerCharacter::UpdateMouseAim`, `AZombieWeapon::VisualShotHeightAboveFeet`). Weapon
+  spread is unchanged and still scatters shots on purpose (pistol ±2°, SMG ±6°, shotguns ±11–13°).
+- **Stuck after New Run: no crosshair, can't move or turn.** `UZombieUIManager` is a local-player
+  subsystem and lives for the whole session. Unreal creates player-owned widgets with the
+  GameInstance as their outer, so they also survive level loads. The main menu (or death screen) left
+  on the menu stack in the previous level was therefore still "on top" in the new one. That blocked
+  gameplay input and kept the default cursor instead of the crosshair. The death screen's "no pause
+  menu" setting also leaked into the next run. The manager now resets its menus, HUD, crosshair
+  cursor and pause flags on `FWorldDelegates::OnWorldCleanup`. Verified headlessly by launching into
+  the main menu and travelling to a sector. With the reset disabled, the log showed the stale
+  `ZombieMainMenuWidget` on top with input blocked. With it enabled, the stack is empty, input is
+  unblocked and the crosshair cursor is active.
+- **Shank: a melee weapon in its own slot.**
+  - Every player always carries it (`DA_RunSettings.MeleeWeapon` → `W_Shank`), in a melee slot
+    separate from the gun slots. It is never counted, sold, traded, saved or dropped as a gun. Draw it
+    with **V** (gamepad **Y**). The mouse wheel cycles guns → shank → guns. When *every* gun is
+    completely dry, pulling the trigger draws the shank automatically instead of dry-clicking.
+  - `UWeaponFireMode_Melee` strikes the single nearest enemy within reach (150 units to the target's
+    edge) inside a 70° half-arc, with no wall in between. It favours whatever is closest to the aim line.
+  - Stats: 35 damage, 1.6 attacks/s (hold to keep stabbing), 10% crit at ×1.5.
+    `OneHitKillTiers = [Low]` kills shamblers in one blow at any sector, whatever their scaled health.
+    Tougher zombies take several.
+  - `bUsesAmmo = false`: no magazine, no reload, never runs dry. Stabbing is a small ordinary noise,
+    not a gunshot, so it doesn't aggravate the floor.
+  - The HUD shows a `V SHANK` slot after the gun slots (highlighted while drawn) and `--` in place of
+    the ammo counter. New held-weapon sprite frame (the weapon sheet grew from 4×2 to 4×3) and three
+    new swing sounds (`SFX_Shank_Swing_0..2`).
+  - Trade-ins (shop and loot) always swap the last-drawn *gun*, never the shank.
+    `UInventoryComponent::ActiveIndex` keeps naming that gun while the shank is out.
+  - New `ZombieMeleeTest` cheat, also run at the start of `ZombieSmokeTest`. It confirms a full-health
+    shambler dies to one stab and a Runner survives one (42 → 7 HP).
+
 ### Playtest fixes: the game is now called Rotshot, plus AI, hit detection, spawning and audio
 
 User playtest report, item by item.

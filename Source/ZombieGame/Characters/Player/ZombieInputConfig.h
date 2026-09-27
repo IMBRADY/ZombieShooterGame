@@ -44,6 +44,9 @@ public:
 	/** Axis1D: +1 next weapon, -1 previous (mouse wheel, shoulder buttons). */
 	UPROPERTY() TObjectPtr<UInputAction> CycleWeapon;
 
+	/** Draws the melee weapon from its own slot. */
+	UPROPERTY() TObjectPtr<UInputAction> Melee;
+
 	UPROPERTY() TObjectPtr<UInputAction> Pause;
 
 private:

@@ -251,7 +251,7 @@ def build_sheet(style, scale=1, is_player=False):
 
 # --- held weapons ---------------------------------------------------------------------------------
 
-WEAPON_FRAMES = ["Pistol", "SMG", "Shotgun", "Rifle", "Sniper", "RocketLauncher", "Special", "Revolver"]
+WEAPON_FRAMES = ["Pistol", "SMG", "Shotgun", "Rifle", "Sniper", "RocketLauncher", "Special", "Revolver", "Shank"]
 
 
 def _weapon(name):
@@ -286,6 +286,14 @@ def _weapon(name):
         c.rect(11, 13.5, 29, 14.5, rgba("#6c7c4a"))
         c.polygon([(29, 14), (31.5, 16), (29, 18)], rgba("#b83020"))
         c.rect(18, 18.5, 20, 21, dark)
+    elif name == "Shank":
+        # A scavenged blade: a jagged steel shard with a rag-wrapped grip.
+        c.rect(17, 15.2, 21, 17, rgba("#7a6a52"))
+        c.rect(18, 15.2, 18.8, 17, rgba("#4e4232"))
+        c.rect(20, 15.2, 20.8, 17, rgba("#4e4232"))
+        c.polygon([(21, 14.9), (27.5, 15.6), (29, 16.1), (27, 16.9), (21, 17.2)], rgba("#a8adb4"))
+        c.polygon([(21, 14.9), (27.5, 15.6), (29, 16.1), (21, 15.8)], rgba("#dfe3e8"))
+        c.put(25, 16.6, rgba("#6a3028"))
     elif name == "Special":
         c.rect(14, 14, 27, 18, rgba("#1c3a44"))
         c.rect(14.5, 14.5, 26.5, 15.5, rgba("#3a8aa0"))
@@ -296,7 +304,7 @@ def _weapon(name):
 
 
 def build_weapon_sheet():
-    sheet = SpriteSheet(32, 32, 4, 2)
+    sheet = SpriteSheet(32, 32, 4, 3)
     for i, name in enumerate(WEAPON_FRAMES):
         sheet.set(i, _weapon(name))
         sheet.add_animation(name, i, 1, 1.0, False)

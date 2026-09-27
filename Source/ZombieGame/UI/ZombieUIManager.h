@@ -22,6 +22,7 @@ class ZOMBIEGAME_API UZombieUIManager : public ULocalPlayerSubsystem
 public:
 	static UZombieUIManager* Get(const APlayerController* PlayerController);
 
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
 	void ShowHUD();
@@ -73,6 +74,16 @@ public:
 private:
 	void RefreshInputMode();
 	void EnsureCrosshair();
+
+	/**
+	 * This subsystem outlives every level, but its widgets belong to the level's player controller.
+	 * Without this, the main menu or death screen left on the stack by the previous level stayed
+	 * "on top" in the next one - input blocked, crosshair cursor never shown.
+	 */
+	void HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources);
+	void ResetForNewWorld();
+
+	FDelegateHandle WorldCleanupHandle;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UZombieHUDWidget> HUD;

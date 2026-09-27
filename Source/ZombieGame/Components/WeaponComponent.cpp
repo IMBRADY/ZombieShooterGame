@@ -134,6 +134,13 @@ void UWeaponComponent::FireTick()
 		break;
 
 	case EWeaponFireResult::EmptyMagazine:
+		// Every gun is dry: pull the knife instead of clicking, and let this press use it.
+		if (Inventory && Inventory->GetMeleeWeapon() && Inventory->AreAllGunsEmpty())
+		{
+			Inventory->EquipMelee();
+			NextAttempt = WaitRetryInterval;
+			break;
+		}
 		bShotFiredThisPress = true;
 		NextAttempt = EmptyRetryInterval;
 		break;
@@ -185,6 +192,25 @@ void UWeaponComponent::SelectSlot(int32 SlotIndex)
 void UWeaponComponent::ServerSelectSlot_Implementation(int32 SlotIndex)
 {
 	SelectSlot(SlotIndex);
+}
+
+void UWeaponComponent::SelectMelee()
+{
+	if (GetOwnerRole() != ROLE_Authority)
+	{
+		ServerSelectMelee();
+		return;
+	}
+
+	if (Inventory)
+	{
+		Inventory->EquipMelee();
+	}
+}
+
+void UWeaponComponent::ServerSelectMelee_Implementation()
+{
+	SelectMelee();
 }
 
 void UWeaponComponent::CycleWeapon(int32 Direction)

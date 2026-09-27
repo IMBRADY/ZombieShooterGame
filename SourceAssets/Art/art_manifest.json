@@ -37,7 +37,7 @@
   },
   {
    "columns": 4,
-   "rows": 2,
+   "rows": 3,
    "animations": {
     "Pistol": {
      "start": 0,
@@ -83,6 +83,12 @@
     },
     "Revolver": {
      "start": 7,
+     "count": 1,
+     "fps": 1.0,
+     "loop": false
+    },
+    "Shank": {
+     "start": 8,
      "count": 1,
      "fps": 1.0,
      "loop": false

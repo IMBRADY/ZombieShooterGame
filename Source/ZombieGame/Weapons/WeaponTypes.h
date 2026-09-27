@@ -24,7 +24,8 @@ enum class EWeaponCategory : uint8
 	Rifle			UMETA(DisplayName = "Rifle"),
 	Sniper			UMETA(DisplayName = "Sniper"),
 	RocketLauncher	UMETA(DisplayName = "Rocket Launcher"),
-	Special			UMETA(DisplayName = "Special")
+	Special			UMETA(DisplayName = "Special"),
+	Melee			UMETA(DisplayName = "Melee")
 };
 
 /**

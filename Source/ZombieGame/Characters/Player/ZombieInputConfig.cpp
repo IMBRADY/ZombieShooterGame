@@ -26,6 +26,7 @@ UZombieInputConfig::UZombieInputConfig()
 	Interact = MakeAction(*this, TEXT("IA_Interact"), EInputActionValueType::Boolean);
 	WeaponSlot = MakeAction(*this, TEXT("IA_WeaponSlot"), EInputActionValueType::Axis1D);
 	CycleWeapon = MakeAction(*this, TEXT("IA_CycleWeapon"), EInputActionValueType::Axis1D);
+	Melee = MakeAction(*this, TEXT("IA_Melee"), EInputActionValueType::Boolean);
 	Pause = MakeAction(*this, TEXT("IA_Pause"), EInputActionValueType::Boolean);
 
 	// Pause must still fire while the game is paused, or the pause menu could never be closed by key.
@@ -88,6 +89,9 @@ void UZombieInputConfig::BindCombat()
 
 	GameplayContext->MapKey(Interact, EKeys::E);
 	GameplayContext->MapKey(Interact, EKeys::Gamepad_FaceButton_Bottom);
+
+	GameplayContext->MapKey(Melee, EKeys::V);
+	GameplayContext->MapKey(Melee, EKeys::Gamepad_FaceButton_Top);
 
 	GameplayContext->MapKey(CycleWeapon, EKeys::MouseWheelAxis);
 	GameplayContext->MapKey(CycleWeapon, EKeys::Gamepad_RightShoulder);

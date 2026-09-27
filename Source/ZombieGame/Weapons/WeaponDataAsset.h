@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Audio/ZombieAudioTypes.h"
+#include "Characters/Zombies/ZombieArchetypeDataAsset.h"
 #include "Core/ZombieStatTypes.h"
 #include "Engine/DataAsset.h"
 #include "Visual/ZombieEffectTypes.h"
@@ -87,6 +88,23 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Firing")
 	FWeaponUpgradeBonus UpgradeBonus;
+
+	/**
+	 * False for melee weapons: no magazine, no reserve, never reloads, never runs dry - and never
+	 * makes a gunshot, so it doesn't bring the whole floor down on you.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Firing")
+	bool bUsesAmmo = true;
+
+	// --- Melee (only read by UWeaponFireMode_Melee) ---
+
+	/** Half-angle, in degrees, of the arc in front of the attacker a blow can land in. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melee", meta = (ClampMin = "1.0", ClampMax = "180.0"))
+	float MeleeArcHalfAngle = 60.0f;
+
+	/** Zombie classes this weapon kills in a single hit, however much sector scaling raised their health. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Melee")
+	TArray<EZombieClassTier> OneHitKillTiers;
 
 	// --- Economy ---
 

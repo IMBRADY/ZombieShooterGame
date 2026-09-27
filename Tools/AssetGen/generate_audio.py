@@ -304,6 +304,18 @@ def weapons():
             x[k:k + m] += click
         save("Weapons", "SFX_Reload_%d" % v, normalise(x, 0.7))
 
+    # Shank: a quick, light cut through the air - brighter and shorter than a zombie's arm swipe,
+    # with a faint metallic edge.
+    for v in range(3):
+        rng = np.random.default_rng(700 + v)
+        n = int(0.2 * SFX_RATE)
+        t = np.arange(n) / SFX_RATE
+        air = noise(n, rng)
+        swish = bandpass(air, 700 + 100 * v, 2200) * np.sin(np.pi * np.clip(t / 0.16, 0, 1)) ** 2
+        swish += bandpass(air, 2200, 6000) * np.sin(np.pi * np.clip((t - 0.03) / 0.12, 0, 1)) ** 3 * 0.5
+        ring = np.sin(2 * np.pi * (4200 + 300 * v) * t) * np.exp(-t / 0.03) * 0.04
+        save("Weapons", "SFX_Shank_Swing_%d" % v, normalise(fade_tail(swish + ring, 0.03), 0.6))
+
     m = int(0.12 * SFX_RATE)
     rng = np.random.default_rng(99)
     save("Weapons", "SFX_Empty", normalise(bandpass(noise(m, rng), 2500, 7000) * env(m, 0.0005, 0.04, curve=8), 0.5))

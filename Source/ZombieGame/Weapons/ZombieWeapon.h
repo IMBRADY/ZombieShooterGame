@@ -66,6 +66,9 @@ public:
 	bool IsUpgraded() const { return UpgradeLevel > 0; }
 	int32 GetAmmoInMagazine() const { return AmmoInMagazine; }
 	int32 GetReserveAmmo() const { return ReserveAmmo; }
+
+	/** True for a gun with nothing loaded and nothing spare. Never true for a melee weapon. */
+	bool IsCompletelyEmpty() const;
 	bool IsReloading() const { return bReloading; }
 	bool IsAutomatic() const;
 	const FWeaponStats& GetStats() const { return EffectiveStats; }
@@ -85,6 +88,13 @@ public:
 	 * tracer drawn at trace height could be seen crossing a zombie the round had actually missed.
 	 */
 	FVector ToVisualShotHeight(const FVector& GameplayLocation) const;
+
+	/**
+	 * Height above the carrier's feet of that visual plane: just above the character sprites (drawn
+	 * 10-12 units up) so tracers render over bodies. Mouse aim is resolved on this same plane, which
+	 * is what makes a tracer pass exactly under the crosshair.
+	 */
+	static constexpr float VisualShotHeightAboveFeet = 16.0f;
 
 private:
 	void FinishReload();

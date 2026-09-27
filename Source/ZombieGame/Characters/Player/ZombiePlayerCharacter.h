@@ -123,6 +123,7 @@ private:
 	void HandleInteract(const FInputActionValue& Value);
 	void HandleWeaponSlot(const FInputActionValue& Value);
 	void HandleCycleWeapon(const FInputActionValue& Value);
+	void HandleMelee(const FInputActionValue& Value);
 
 	void UpdateMouseAim();
 	void ApplyFacing(const FVector& Direction);

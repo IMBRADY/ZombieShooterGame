@@ -1,7 +1,9 @@
 #include "InventoryComponent.h"
+#include "Core/ZombieRunSettings.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "Weapons/WeaponDataAsset.h"
 #include "Weapons/ZombieWeapon.h"
 
 UInventoryComponent::UInventoryComponent()
@@ -17,6 +19,75 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(UInventoryComponent, Weapons);
 	DOREPLIFETIME(UInventoryComponent, ActiveIndex);
 	DOREPLIFETIME(UInventoryComponent, SlotCount);
+	DOREPLIFETIME(UInventoryComponent, MeleeWeapon);
+	DOREPLIFETIME(UInventoryComponent, bMeleeActive);
+}
+
+void UInventoryComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (GetOwnerRole() == ROLE_Authority)
+	{
+		SpawnMeleeWeapon();
+	}
+}
+
+void UInventoryComponent::SpawnMeleeWeapon()
+{
+	const UZombieRunSettings* RunSettings = UZombieRunSettings::GetOrLoadDefault();
+	if (MeleeWeapon || !RunSettings || !RunSettings->MeleeWeapon)
+	{
+		return;
+	}
+
+	FWeaponInstanceData Instance;
+	Instance.Definition = TSoftObjectPtr<UWeaponDataAsset>(FSoftObjectPath(RunSettings->MeleeWeapon.Get()));
+	MeleeWeapon = SpawnWeapon(Instance);
+
+	// Nothing to shoot with yet (a fresh pawn before its loadout arrives): hold the knife.
+	if (MeleeWeapon && Weapons.Num() == 0)
+	{
+		SwitchTo(true, ActiveIndex);
+	}
+	OnInventoryChanged.Broadcast();
+}
+
+void UInventoryComponent::SwitchTo(bool bMelee, int32 GunIndex)
+{
+	if (AZombieWeapon* Current = GetActiveWeapon())
+	{
+		Current->SetEquipped(false);
+	}
+
+	bMeleeActive = bMelee && MeleeWeapon;
+	ActiveIndex = GunIndex;
+
+	if (AZombieWeapon* Next = GetActiveWeapon())
+	{
+		Next->SetEquipped(true);
+	}
+	OnActiveWeaponChanged.Broadcast(GetActiveWeapon());
+}
+
+void UInventoryComponent::EquipMelee()
+{
+	if (MeleeWeapon && !bMeleeActive)
+	{
+		SwitchTo(true, ActiveIndex);
+	}
+}
+
+bool UInventoryComponent::AreAllGunsEmpty() const
+{
+	for (const AZombieWeapon* Weapon : Weapons)
+	{
+		if (Weapon && !Weapon->IsCompletelyEmpty())
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 AZombieWeapon* UInventoryComponent::SpawnWeapon(const FWeaponInstanceData& Instance)
@@ -58,12 +129,11 @@ AZombieWeapon* UInventoryComponent::AddWeapon(const FWeaponInstanceData& Instanc
 	Weapons.Add(Weapon);
 	OnInventoryChanged.Broadcast();
 
-	// The first gun picked up is drawn immediately; later ones wait in their slot.
+	// The first gun picked up is drawn immediately (out of the melee slot, if that was all there
+	// was); later ones wait in their slot.
 	if (Weapons.Num() == 1)
 	{
-		ActiveIndex = 0;
-		Weapon->SetEquipped(true);
-		OnActiveWeaponChanged.Broadcast(Weapon);
+		SwitchTo(false, 0);
 	}
 	return Weapon;
 }
@@ -91,7 +161,7 @@ FWeaponInstanceData UInventoryComponent::ReplaceWeapon(int32 SlotIndex, const FW
 	Weapons[SlotIndex] = NewWeapon;
 	OnInventoryChanged.Broadcast();
 
-	if (SlotIndex == ActiveIndex)
+	if (SlotIndex == ActiveIndex && !IsMeleeActive())
 	{
 		NewWeapon->SetEquipped(true);
 		OnActiveWeaponChanged.Broadcast(NewWeapon);
@@ -113,7 +183,15 @@ bool UInventoryComponent::RemoveWeapon(int32 SlotIndex, FWeaponInstanceData& Out
 	}
 	Weapons.RemoveAt(SlotIndex);
 
+	const bool bRemovedDrawnGun = SlotIndex == ActiveIndex;
 	ActiveIndex = FMath::Clamp(ActiveIndex >= SlotIndex ? ActiveIndex - 1 : ActiveIndex, 0, Weapons.Num() - 1);
+	if (bRemovedDrawnGun && !IsMeleeActive())
+	{
+		if (AZombieWeapon* Drawn = GetActiveWeapon())
+		{
+			Drawn->SetEquipped(true);
+		}
+	}
 	OnInventoryChanged.Broadcast();
 	OnActiveWeaponChanged.Broadcast(GetActiveWeapon());
 	return true;
@@ -121,33 +199,32 @@ bool UInventoryComponent::RemoveWeapon(int32 SlotIndex, FWeaponInstanceData& Out
 
 void UInventoryComponent::EquipSlot(int32 SlotIndex)
 {
-	if (!Weapons.IsValidIndex(SlotIndex) || SlotIndex == ActiveIndex)
+	if (!Weapons.IsValidIndex(SlotIndex) || (SlotIndex == ActiveIndex && !IsMeleeActive()))
 	{
 		return;
 	}
-
-	if (AZombieWeapon* Current = GetActiveWeapon())
-	{
-		Current->SetEquipped(false);
-	}
-
-	ActiveIndex = SlotIndex;
-
-	if (AZombieWeapon* Next = GetActiveWeapon())
-	{
-		Next->SetEquipped(true);
-	}
-	OnActiveWeaponChanged.Broadcast(GetActiveWeapon());
+	SwitchTo(false, SlotIndex);
 }
 
 void UInventoryComponent::CycleWeapon(int32 Direction)
 {
-	if (Weapons.Num() <= 1)
+	// Positions 0..N-1 are the guns; position N is the melee slot.
+	const int32 PositionCount = Weapons.Num() + (MeleeWeapon ? 1 : 0);
+	if (PositionCount <= 1)
 	{
 		return;
 	}
-	const int32 Step = Direction >= 0 ? 1 : -1;
-	EquipSlot((ActiveIndex + Step + Weapons.Num()) % Weapons.Num());
+
+	const int32 Current = IsMeleeActive() ? Weapons.Num() : ActiveIndex;
+	const int32 Next = (Current + (Direction >= 0 ? 1 : -1) + PositionCount) % PositionCount;
+	if (Next == Weapons.Num())
+	{
+		EquipMelee();
+	}
+	else
+	{
+		EquipSlot(Next);
+	}
 }
 
 void UInventoryComponent::AddSlot()
@@ -174,6 +251,10 @@ void UInventoryComponent::RefreshWeaponStats()
 		{
 			Weapon->RefreshStats();
 		}
+	}
+	if (MeleeWeapon)
+	{
+		MeleeWeapon->RefreshStats();
 	}
 	OnInventoryChanged.Broadcast();
 }
@@ -205,6 +286,12 @@ void UInventoryComponent::ImportWeapons(const TArray<FWeaponInstanceData>& InWea
 		}
 	}
 
+	// A restored checkpoint resumes with a gun drawn (the melee weapon if there are none).
+	if (MeleeWeapon)
+	{
+		MeleeWeapon->SetEquipped(false);
+	}
+	bMeleeActive = Weapons.Num() == 0 && MeleeWeapon;
 	ActiveIndex = Weapons.Num() > 0 ? FMath::Clamp(InActiveIndex, 0, Weapons.Num() - 1) : 0;
 	if (AZombieWeapon* Active = GetActiveWeapon())
 	{
@@ -233,6 +320,11 @@ void UInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (GetOwnerRole() == ROLE_Authority)
 	{
 		DestroyAllWeapons();
+		if (IsValid(MeleeWeapon))
+		{
+			MeleeWeapon->Destroy();
+		}
+		MeleeWeapon = nullptr;
 	}
 	Super::EndPlay(EndPlayReason);
 }

@@ -2,6 +2,7 @@
 #include "Characters/Player/ZombiePlayerCharacter.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -22,11 +23,57 @@ UZombieUIManager* UZombieUIManager::Get(const APlayerController* PlayerControlle
 	return LocalPlayer ? LocalPlayer->GetSubsystem<UZombieUIManager>() : nullptr;
 }
 
+void UZombieUIManager::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	WorldCleanupHandle = FWorldDelegates::OnWorldCleanup.AddUObject(this, &UZombieUIManager::HandleWorldCleanup);
+}
+
 void UZombieUIManager::Deinitialize()
 {
+	FWorldDelegates::OnWorldCleanup.Remove(WorldCleanupHandle);
 	PopAllMenus();
 	HideHUD();
 	Super::Deinitialize();
+}
+
+void UZombieUIManager::HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources)
+{
+	if (World && World->IsGameWorld())
+	{
+		ResetForNewWorld();
+	}
+}
+
+void UZombieUIManager::ResetForNewWorld()
+{
+	// No RefreshInputMode here: the player controller is being torn down with its world. The next
+	// level's controller sets input up again through ShowHUD / PushMenu.
+	for (UZombieMenuWidget* Menu : MenuStack)
+	{
+		if (Menu)
+		{
+			Menu->RemoveFromParent();
+		}
+	}
+	MenuStack.Reset();
+
+	HideHUD();
+
+	// The software cursor is registered on the viewport, which survives the level: drop the old
+	// crosshair so EnsureCrosshair builds one for the new controller.
+	if (Crosshair)
+	{
+		if (UGameViewportClient* Viewport = GetLocalPlayer() ? GetLocalPlayer()->ViewportClient : nullptr)
+		{
+			Viewport->SetSoftwareCursorWidget(EMouseCursor::Crosshairs, nullptr);
+		}
+		Crosshair = nullptr;
+	}
+
+	// Per-level state: the death screen turns the pause menu off, and must not do so for the next run.
+	bAllowPauseMenu = true;
+	bPausedByMenu = false;
 }
 
 void UZombieUIManager::EnsureCrosshair()

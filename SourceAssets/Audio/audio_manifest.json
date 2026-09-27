@@ -183,6 +183,27 @@
    "category": "Effects"
   },
   {
+   "name": "SFX_Shank_Swing_0",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Shank_Swing_0.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Shank_Swing_1",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Shank_Swing_1.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
+   "name": "SFX_Shank_Swing_2",
+   "folder": "Weapons",
+   "file": "SourceAssets\\Audio\\Weapons\\SFX_Shank_Swing_2.wav",
+   "loop": false,
+   "category": "Effects"
+  },
+  {
    "name": "SFX_Empty",
    "folder": "Weapons",
    "file": "SourceAssets\\Audio\\Weapons\\SFX_Empty.wav",

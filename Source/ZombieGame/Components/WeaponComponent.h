@@ -29,6 +29,7 @@ public:
 	void StopFire();
 	void Reload();
 	void SelectSlot(int32 SlotIndex);
+	void SelectMelee();
 	void CycleWeapon(int32 Direction);
 
 	/** Disables firing entirely (shop open, dead, paused). */
@@ -58,6 +59,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerCycleWeapon(int32 Direction);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSelectMelee();
 
 	void SetTriggerHeld(bool bHeld);
 

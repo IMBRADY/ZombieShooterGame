@@ -86,6 +86,11 @@ void AZombieWeapon::RefreshStats()
 	BroadcastAmmo();
 }
 
+bool AZombieWeapon::IsCompletelyEmpty() const
+{
+	return Definition && Definition->bUsesAmmo && AmmoInMagazine <= 0 && ReserveAmmo <= 0;
+}
+
 bool AZombieWeapon::IsAutomatic() const
 {
 	return Definition && Definition->bAutomatic;
@@ -110,7 +115,7 @@ EWeaponFireResult AZombieWeapon::TryFire(const FVector& AimDirection)
 		return EWeaponFireResult::Cooldown;
 	}
 
-	if (AmmoInMagazine <= 0)
+	if (Definition->bUsesAmmo && AmmoInMagazine <= 0)
 	{
 		// "Reloads automatically if ammo is completely depleted and spare magazines are available."
 		if (!StartReload())
@@ -125,7 +130,10 @@ EWeaponFireResult AZombieWeapon::TryFire(const FVector& AimDirection)
 	}
 
 	LastFireTime = Now;
-	--AmmoInMagazine;
+	if (Definition->bUsesAmmo)
+	{
+		--AmmoInMagazine;
+	}
 
 	APawn* OwnerPawn = GetInstigator();
 	FWeaponFireContext Context;
@@ -143,7 +151,7 @@ EWeaponFireResult AZombieWeapon::TryFire(const FVector& AimDirection)
 	PlayFireFeedback(Context.Origin, Context.Direction);
 	BroadcastAmmo();
 
-	if (AmmoInMagazine <= 0)
+	if (Definition->bUsesAmmo && AmmoInMagazine <= 0)
 	{
 		StartReload();
 	}
@@ -153,9 +161,6 @@ EWeaponFireResult AZombieWeapon::TryFire(const FVector& AimDirection)
 
 FVector AZombieWeapon::ToVisualShotHeight(const FVector& GameplayLocation) const
 {
-	// Just above the sprites (drawn 10-12 units above the feet), so tracers render over bodies.
-	constexpr float VisualShotHeightAboveFeet = 16.0f;
-
 	const AActor* Carrier = GetOwner() ? GetOwner() : this;
 	float HalfHeight = 0.0f;
 	float Radius = 0.0f;
@@ -184,7 +189,9 @@ void AZombieWeapon::PlayFireFeedback(const FVector& Muzzle, const FVector& Direc
 
 	// "Gunshots attract zombies very well": every shot is a hearing stimulus across NoiseRange,
 	// tagged so zombies inside the alert radius hunt the shooter instead of just investigating.
-	UAISense_Hearing::ReportNoiseEvent(this, Muzzle, 1.0f, GetInstigator(), EffectiveStats.NoiseRange, AZombieAIController::GunshotNoiseTag);
+	// A knife is only an ordinary (small) noise.
+	const FName NoiseTag = Definition->bUsesAmmo ? AZombieAIController::GunshotNoiseTag : NAME_None;
+	UAISense_Hearing::ReportNoiseEvent(this, Muzzle, 1.0f, GetInstigator(), EffectiveStats.NoiseRange, NoiseTag);
 
 	OnFired.Broadcast(Definition->ShakeStrength);
 }
@@ -192,7 +199,7 @@ void AZombieWeapon::PlayFireFeedback(const FVector& Muzzle, const FVector& Direc
 bool AZombieWeapon::StartReload()
 {
 	UWorld* World = GetWorld();
-	if (!Definition || !World || bReloading || ReserveAmmo <= 0 || AmmoInMagazine >= EffectiveStats.MagazineSize)
+	if (!Definition || !Definition->bUsesAmmo || !World || bReloading || ReserveAmmo <= 0 || AmmoInMagazine >= EffectiveStats.MagazineSize)
 	{
 		return false;
 	}

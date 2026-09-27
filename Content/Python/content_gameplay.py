@@ -12,6 +12,7 @@ LOOT_DIR = "/Game/DataAssets/Loot"
 
 HITSCAN = unreal.load_class(None, "/Script/ZombieGame.WeaponFireMode_Hitscan")
 PROJECTILE = unreal.load_class(None, "/Script/ZombieGame.WeaponFireMode_Projectile")
+MELEE = unreal.load_class(None, "/Script/ZombieGame.WeaponFireMode_Melee")
 FIRE_DAMAGE = unreal.load_class(None, "/Script/ZombieGame.DamageType_Fire")
 POISON_DAMAGE = unreal.load_class(None, "/Script/ZombieGame.DamageType_Poison")
 
@@ -84,11 +85,12 @@ def build_weapons():
 
     def weapon(asset_name, name, description, category, frame, fire_sound, base, *, automatic=False, projectile=None,
                price=200, upgrade=350, refill=60, weight=1.0, min_sector=1, shop=True, loot=True, tracer=(1.0, 0.85, 0.4),
-               tracer_width=10.0, shake=0.1, flash=None, effects=None, legendary=None, muzzle_offset=75.0):
+               tracer_width=10.0, shake=0.1, flash=None, effects=None, legendary=None, muzzle_offset=75.0, fire_mode=None,
+               extra=None):
         asset, _ = get_or_create(asset_name, WEAPON_DIR, unreal.WeaponDataAsset)
         apply(asset, {
             "display_name": name, "description": description, "category": category, "base_stats": base, "automatic": automatic,
-            "fire_mode": PROJECTILE if projectile else HITSCAN, "base_price": price, "base_upgrade_price": upgrade,
+            "fire_mode": fire_mode or (PROJECTILE if projectile else HITSCAN), "base_price": price, "base_upgrade_price": upgrade,
             "ammo_refill_price": refill, "shop_weight": weight, "min_sector": min_sector, "available_in_shop": shop,
             "can_drop_as_loot": loot, "held_sprite_frame": frame, "muzzle_offset": muzzle_offset, "muzzle_flash": flash or muzzle,
             "impact_effect": sparks, "draw_tracers": projectile is None, "tracer_color": unreal.LinearColor(*tracer, 1.0),
@@ -97,6 +99,8 @@ def build_weapons():
         })
         if projectile:
             asset.set_editor_property("projectile", projectile)
+        if extra:
+            apply(asset, extra)
         save(asset)
         WEAPONS[asset_name] = asset
 
@@ -142,6 +146,15 @@ def build_weapons():
            stats(damage=30.0, shots_per_second=10.0, magazine_size=100, max_reserve_ammo=300, reload_time=3.4, spread_degrees=4.5, crit_chance=0.08,
                  pierce=1, range=4000.0), automatic=True, price=1500, upgrade=900, refill=200, min_sector=5, shop=False, shake=0.14,
            legendary=[hit_effect("Status.Burning", 0.4), hit_effect("Status.Poisoned", 0.2)])
+    # Always carried in its own melee slot (DA_RunSettings.melee_weapon) - never sold, traded or
+    # dropped. One-shots shamblers at any sector; a few stabs for anything bigger.
+    weapon("W_Shank", "Shank", "A sharpened scrap of steel. Never runs dry.", cat.MELEE, 8, sound("SFX_Shank_Swing", 0.7, 0.08, count=3),
+           stats(damage=35.0, shots_per_second=1.6, magazine_size=1, max_reserve_ammo=0, reload_time=0.05, spread_degrees=0.0,
+                 crit_chance=0.1, crit_multiplier=1.5, range=150.0, noise_range=500.0),
+           automatic=True, price=0, upgrade=0, refill=0, weight=0.0, shop=False, loot=False, shake=0.08, muzzle_offset=40.0,
+           flash=effect(), fire_mode=MELEE,
+           extra={"uses_ammo": False, "draw_tracers": False, "impact_effect": effect("BloodHit", 1.3),
+                  "melee_arc_half_angle": 70.0, "one_hit_kill_tiers": [unreal.ZombieClassTier.LOW]})
     note("built %d weapons" % len(WEAPONS))
 
 
@@ -229,7 +242,7 @@ def build_settings():
     save(shop)
 
     run, _ = get_or_create("DA_RunSettings", "/Game/DataAssets", unreal.ZombieRunSettings)
-    apply(run, {"starting_weapons": [WEAPONS["W_Pistol"]], "starting_money": 0, "boss_sector_interval": 5,
+    apply(run, {"starting_weapons": [WEAPONS["W_Pistol"]], "melee_weapon": WEAPONS["W_Shank"], "starting_money": 0, "boss_sector_interval": 5,
                 "boss_reward_table": LOOT["LT_Boss"], "difficulty_increase_per_sector": 0.15})
     save(run)
     note("built shop and run settings")

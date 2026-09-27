@@ -1,5 +1,6 @@
 #include "ZombieCheatManager.h"
 #include "Characters/Player/ZombiePlayerController.h"
+#include "Characters/Zombies/ZombieArchetypeDataAsset.h"
 #include "Characters/Zombies/ZombieCharacter.h"
 #include "Characters/Zombies/ZombieEnemyManager.h"
 #include "Components/DamageComponent.h"
@@ -18,6 +19,8 @@
 #include "Shop/ShopTransactionComponent.h"
 #include "Shop/ZombieShopState.h"
 #include "TimerManager.h"
+#include "Utilities/ZombiePrimaryAssetLoader.h"
+#include "Weapons/WeaponDataAsset.h"
 #include "Weapons/ZombieWeapon.h"
 #include "ZombieGame.h"
 
@@ -92,7 +95,96 @@ void UZombieCheatManager::ZombieSmokeTest(int32 TargetSector)
 		ZombieGod();
 	}
 	UE_LOG(LogZombieGame, Log, TEXT("[SmokeTest] Started: running the loop until sector %d."), SmokeTestTarget);
+	ZombieMeleeTest();
 	GetWorld()->GetTimerManager().SetTimer(SmokeTestTimer, FTimerDelegate::CreateUObject(this, &UZombieCheatManager::SmokeTestStep), 1.0f, true);
+}
+
+AZombieCharacter* UZombieCheatManager::SpawnMeleeTestZombie(EZombieClassTier Tier) const
+{
+	APawn* Pawn = GetPlayerPawn();
+	UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(GetWorld());
+	if (!Pawn || !Enemies)
+	{
+		return nullptr;
+	}
+
+	TArray<UZombieArchetypeDataAsset*> Archetypes;
+	FZombiePrimaryAssetLoader::LoadAllOfType(UZombieArchetypeDataAsset::AssetType, Archetypes);
+	Archetypes.Sort([](const UZombieArchetypeDataAsset& Lhs, const UZombieArchetypeDataAsset& Rhs) { return Lhs.GetName() < Rhs.GetName(); });
+	// Only plain zombies: one with abilities (an exploder detonating on contact) could die by its
+	// own hand before the second stab lands.
+	UZombieArchetypeDataAsset* const* Match = Archetypes.FindByPredicate([Tier](const UZombieArchetypeDataAsset* Archetype)
+	{
+		return Archetype && Archetype->Tier == Tier && Archetype->Abilities.Num() == 0;
+	});
+	if (!Match)
+	{
+		return nullptr;
+	}
+
+	FZombieSpawnOptions Options;
+	Options.bGrantsRewards = false;
+	return Enemies->SpawnZombie(*Match, Pawn->GetActorLocation() + Pawn->GetActorForwardVector() * 110.0f, Options);
+}
+
+bool UZombieCheatManager::SwingMelee() const
+{
+	APawn* Pawn = GetPlayerPawn();
+	UInventoryComponent* Inventory = Pawn ? Pawn->FindComponentByClass<UInventoryComponent>() : nullptr;
+	if (!Inventory || !Inventory->GetMeleeWeapon())
+	{
+		return false;
+	}
+	Inventory->EquipMelee();
+	return Inventory->GetActiveWeapon() == Inventory->GetMeleeWeapon()
+		&& Inventory->GetMeleeWeapon()->TryFire(Pawn->GetActorForwardVector()) == EWeaponFireResult::Fired;
+}
+
+void UZombieCheatManager::ZombieMeleeTest()
+{
+	APawn* Pawn = GetPlayerPawn();
+	UInventoryComponent* Inventory = Pawn ? Pawn->FindComponentByClass<UInventoryComponent>() : nullptr;
+	const AZombieWeapon* Melee = Inventory ? Inventory->GetMeleeWeapon() : nullptr;
+	if (!Melee || !Melee->GetDefinition())
+	{
+		UE_LOG(LogZombieGame, Error, TEXT("[MeleeTest] FAIL: the player has no melee weapon."));
+		return;
+	}
+	UE_LOG(LogZombieGame, Log, TEXT("[MeleeTest] Melee slot holds '%s' (uses ammo: %s); %d gun(s) in %d slot(s)."),
+		*Melee->GetDefinition()->DisplayName.ToString(), Melee->GetDefinition()->bUsesAmmo ? TEXT("yes") : TEXT("no"),
+		Inventory->GetWeaponCount(), Inventory->GetSlotCount());
+
+	// A shambler at full, sector-scaled health must die to a single stab.
+	AZombieCharacter* Shambler = SpawnMeleeTestZombie(EZombieClassTier::Low);
+	const bool bSwung = SwingMelee();
+	const bool bKilled = Shambler && Shambler->IsDead();
+	UE_LOG(LogZombieGame, Log, TEXT("[MeleeTest] %s: one stab on a shambler (swung=%d, dead=%d)."),
+		bSwung && bKilled ? TEXT("PASS") : TEXT("FAIL"), bSwung, bKilled);
+
+	// Anything tougher takes more than one - the second check waits out the swing cooldown.
+	MeleeTestTarget = SpawnMeleeTestZombie(EZombieClassTier::Medium);
+	FTimerHandle Handle;
+	GetWorld()->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateUObject(this, &UZombieCheatManager::MeleeTestSecondStab), 0.8f, false);
+}
+
+void UZombieCheatManager::MeleeTestSecondStab()
+{
+	AZombieCharacter* Target = MeleeTestTarget.Get();
+	const UHealthComponent* Health = Target ? Target->FindComponentByClass<UHealthComponent>() : nullptr;
+	const bool bSwung = SwingMelee();
+	const bool bPass = bSwung && Health && !Health->IsDead() && Health->GetHealth() < Health->GetMaxHealth();
+	UE_LOG(LogZombieGame, Log, TEXT("[MeleeTest] %s: one stab on a tougher zombie wounds it (swung=%d, health %.0f / %.0f)."),
+		bPass ? TEXT("PASS") : TEXT("FAIL"), bSwung, Health ? Health->GetHealth() : -1.0f, Health ? Health->GetMaxHealth() : -1.0f);
+
+	// Back to the gun for the rest of the run.
+	if (APawn* Pawn = GetPlayerPawn())
+	{
+		if (UInventoryComponent* Inventory = Pawn->FindComponentByClass<UInventoryComponent>())
+		{
+			Inventory->EquipSlot(0);
+			UE_LOG(LogZombieGame, Log, TEXT("[MeleeTest] Switched back to slot 1: melee active=%d."), Inventory->IsMeleeActive());
+		}
+	}
 }
 
 void UZombieCheatManager::SmokeTestStep()
