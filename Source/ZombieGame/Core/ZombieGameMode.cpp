@@ -179,7 +179,7 @@ void AZombieGameMode::StartEncounter(int32 Sector)
 		Audio->SetMusicState(EZombieMusicState::Sector);
 	}
 
-	SpawnDirector->BeginSector(Sector, SectorGenerator->GetZombieSpawnLocations(), bBossSector ? PickBossArchetype(Sector) : nullptr);
+	SpawnDirector->BeginSector(Sector, SectorGenerator->GetZombieSpawnAreas(), bBossSector ? PickBossArchetype(Sector) : nullptr);
 
 	// No arena fit this sector: the boss comes looking for the player straight away.
 	if (bBossSector && !SectorGenerator->HasBossArena())

@@ -25,7 +25,7 @@ namespace
 		}
 		if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(&Owner))
 		{
-			Audio->PlaySoundAtLocation(Sound, Location);
+			Audio->PlayCreatureSoundAtLocation(Sound, Location);
 		}
 		Owner.ShakeNearbyPlayers(Location, Shake);
 	}

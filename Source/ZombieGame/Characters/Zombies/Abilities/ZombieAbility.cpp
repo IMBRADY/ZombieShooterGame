@@ -62,7 +62,7 @@ float UZombieAbility::Activate(AZombieCharacter& Owner, AActor* Target)
 
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(&Owner))
 	{
-		Audio->PlaySoundAtLocation(Sound, Owner.GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Sound, Owner.GetActorLocation());
 	}
 	if (UZombieEffectsSubsystem* Effects = UZombieEffectsSubsystem::Get(&Owner))
 	{

@@ -169,7 +169,18 @@ UBTCompositeNode* UZombieAIAssetSubsystem::BuildInvestigateBranch(UBehaviorTree&
 	Forget->Configure(ZombieBlackboardKeys::InvestigateLocation);
 	AttachTask(*Investigate, Forget);
 
-	return Investigate;
+	// If the noise cannot be reached the sequence fails with the key still set - and the key's own
+	// decorator then re-selects this branch every frame, so the zombie froze in place. Forgetting an
+	// unreachable noise lets it fall through to roaming instead.
+	UBTComposite_Selector* InvestigateOrGiveUp = MakeNode<UBTComposite_Selector>(Tree, TEXT("Sel_Investigate"));
+	InvestigateOrGiveUp->NodeName = TEXT("Investigate or Give Up");
+	AttachComposite(*InvestigateOrGiveUp, Investigate, nullptr);
+
+	UBTTask_ZombieClearBlackboardValue* GiveUp = MakeNode<UBTTask_ZombieClearBlackboardValue>(Tree, TEXT("Task_GiveUpOnNoise"));
+	GiveUp->Configure(ZombieBlackboardKeys::InvestigateLocation);
+	AttachTask(*InvestigateOrGiveUp, GiveUp);
+
+	return InvestigateOrGiveUp;
 }
 
 UBTCompositeNode* UZombieAIAssetSubsystem::BuildRoamBranch(UBehaviorTree& Tree) const

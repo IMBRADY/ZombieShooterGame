@@ -30,7 +30,7 @@ void UZombieMainMenuWidget::BuildWidget(UWidgetTree& Tree)
 	BackgroundSlot->SetOffsets(FMargin(0.0f));
 
 	UVerticalBox* Column = Tree.ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	Column->AddChildToVerticalBox(ZombieUI::MakeText(Tree, LOCTEXT("Title", "DEAD SECTOR"), 64, ZombieUI::Accent))->SetHorizontalAlignment(HAlign_Center);
+	Column->AddChildToVerticalBox(ZombieUI::MakeText(Tree, LOCTEXT("Title", "ROTSHOT"), 64, ZombieUI::Accent))->SetHorizontalAlignment(HAlign_Center);
 	Column->AddChildToVerticalBox(ZombieUI::MakeText(Tree, LOCTEXT("Tagline", "Clear the sector. Take the key. Spend it well."), 13, ZombieUI::TextDimColor))
 		->SetHorizontalAlignment(HAlign_Center);
 

@@ -48,7 +48,45 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Investigating", meta = (ClampMin = "0.0"))
 	float InvestigateLookAroundTime = 1.5f;
 
+	// --- Alertness ---
+
+	/**
+	 * Every zombie within this distance of a gunshot is aggravated: it hunts the shooter outright
+	 * rather than merely investigating the noise. Walls do not muffle it - "gunshots attract zombies
+	 * very well". Archetype hearing ranges are raised to at least this.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Alertness", meta = (ClampMin = "0.0"))
+	float GunshotAlertRadius = 3200.0f;
+
+	/**
+	 * How long an aggravated zombie (shot at, or near a gunshot) keeps hunting a player it cannot
+	 * see. Every further shot restarts the clock, so a zombie never calms down mid-firefight.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Alertness", meta = (ClampMin = "0.0"))
+	float AggravatedMemorySeconds = 12.0f;
+
+	/**
+	 * A player this close is noticed regardless of where the zombie is facing (with a clear line
+	 * between them), and a hunted player this close is never forgotten.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Alertness", meta = (ClampMin = "0.0"))
+	float ProximityAwarenessRadius = 550.0f;
+
 	// --- Chasing ---
+
+	/**
+	 * A chasing zombie that has moved less than this in StuckCheckInterval is treated as stuck
+	 * (wedged on a corner, blocked by the crowd) and switches to real pathfinding for a moment.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chasing", meta = (ClampMin = "0.0"))
+	float StuckDistanceThreshold = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chasing", meta = (ClampMin = "0.1"))
+	float StuckCheckInterval = 0.75f;
+
+	/** How long a stuck zombie follows a navmesh path before going back to the flow field. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Chasing", meta = (ClampMin = "0.1"))
+	float StuckRecoverySeconds = 1.5f;
 
 	/**
 	 * How often the shared player-centred flow field is re-flooded. This is the horde's whole

@@ -213,19 +213,61 @@ bool UZombieFlowFieldSubsystem::GetFlowDirection(const FVector& WorldLocation, F
 	}
 
 	const FIntPoint Cell = Grid.WorldToCell(WorldLocation);
-	if (!Grid.IsWalkable(Cell))
+	if (Grid.IsWalkable(Cell))
+	{
+		const int32 CellIndex = Grid.ToIndex(Cell);
+		const FVector2f Direction = Directions[CellIndex];
+		if (!Direction.IsNearlyZero())
+		{
+			OutDirection = FVector(Direction.X, Direction.Y, 0.0f);
+			return true;
+		}
+
+		// The player's own cell: the caller steers straight at them.
+		if (Distances[CellIndex] == 0)
+		{
+			return false;
+		}
+	}
+
+	// Pushed onto the edge of an obstacle or wall cell (a crowd shoves zombies about), or on a cell
+	// the flood never reached. Steering straight at the player from here is what used to pin
+	// zombies against the obstacle in between; head for the best neighbouring cell instead.
+	return GetDirectionTowardBestNeighbour(WorldLocation, Cell, OutDirection);
+}
+
+bool UZombieFlowFieldSubsystem::GetDirectionTowardBestNeighbour(const FVector& WorldLocation, const FIntPoint& Cell, FVector& OutDirection) const
+{
+	int32 BestDistance = TNumericLimits<int32>::Max();
+	FIntPoint BestCell = Cell;
+
+	for (int32 OffsetX = -1; OffsetX <= 1; ++OffsetX)
+	{
+		for (int32 OffsetY = -1; OffsetY <= 1; ++OffsetY)
+		{
+			const FIntPoint Neighbour = Cell + FIntPoint(OffsetX, OffsetY);
+			if (Neighbour == Cell || !Grid.IsWalkable(Neighbour))
+			{
+				continue;
+			}
+
+			const int32 NeighbourDistance = Distances[Grid.ToIndex(Neighbour)];
+			if (NeighbourDistance != INDEX_NONE && NeighbourDistance < BestDistance)
+			{
+				BestDistance = NeighbourDistance;
+				BestCell = Neighbour;
+			}
+		}
+	}
+
+	if (BestCell == Cell)
 	{
 		return false;
 	}
 
-	const FVector2f Direction = Directions[Grid.ToIndex(Cell)];
-	if (Direction.IsNearlyZero())
-	{
-		return false;
-	}
-
-	OutDirection = FVector(Direction.X, Direction.Y, 0.0f);
-	return true;
+	const FVector2D Centre = Grid.CellToWorld(BestCell);
+	OutDirection = (FVector(Centre.X, Centre.Y, WorldLocation.Z) - WorldLocation).GetSafeNormal2D();
+	return !OutDirection.IsNearlyZero();
 }
 
 int32 UZombieFlowFieldSubsystem::GetDistanceToNearestPlayer(const FVector& WorldLocation) const

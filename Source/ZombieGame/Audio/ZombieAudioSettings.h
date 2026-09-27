@@ -63,6 +63,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Intensity", meta = (ClampMin = "0.05"))
 	float IntensityFallRate = 0.35f;
 
+	// --- Creature voices ---
+
+	/**
+	 * Zombie voices (groans, screams, attacks, deaths) play at full volume within this distance of
+	 * the player, then fade out.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Creatures", meta = (ClampMin = "0.0"))
+	float CreatureFullVolumeRadius = 350.0f;
+
+	/**
+	 * Beyond this distance a zombie is silent. The fade between the two is quadratic, so a zombie
+	 * halfway out is already quiet - the horde across the building is a murmur, not a wall of noise.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Creatures", meta = (ClampMin = "100.0"))
+	float CreatureAudibleDistance = 2200.0f;
+
 	// --- Shared one-shots, looked up by name (UI.Click, Pickup.Money, Door.Unlock, ...) ---
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "One-shots")

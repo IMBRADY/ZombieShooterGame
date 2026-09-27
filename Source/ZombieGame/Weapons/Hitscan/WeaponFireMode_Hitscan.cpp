@@ -18,13 +18,36 @@ namespace
 	/** How far from a bounce point a ricochet will look for an enemy to redirect toward. */
 	constexpr float RicochetSeekRadius = 900.0f;
 
-	FCollisionObjectQueryParams MakeShotObjectQuery()
+	/**
+	 * One straight stretch of a round's flight. Walls and cover stop rounds; pawns take them;
+	 * pickups and triggers (WorldDynamic) don't. Walls are tested with a thin line so rounds still
+	 * thread gaps and graze corners, bodies with a sphere of BodyRadius so what the player sees hit
+	 * a zombie's sprite actually hits it.
+	 */
+	bool TraceShotSegment(const UWorld& World, const FVector& Start, const FVector& End, const FCollisionQueryParams& Params,
+		float BodyRadius, FHitResult& OutHit)
 	{
-		// Walls and cover stop rounds; pawns take them. Pickups and triggers (WorldDynamic) don't.
-		FCollisionObjectQueryParams Objects;
-		Objects.AddObjectTypesToQuery(ECC_WorldStatic);
-		Objects.AddObjectTypesToQuery(ECC_Pawn);
-		return Objects;
+		FHitResult WallHit;
+		const bool bHitWall = World.LineTraceSingleByObjectType(WallHit, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+		const FVector BodyTraceEnd = bHitWall ? WallHit.Location : End;
+
+		FHitResult BodyHit;
+		const FCollisionObjectQueryParams Bodies(ECC_Pawn);
+		const bool bHitBody = BodyRadius > 0.0f
+			? World.SweepSingleByObjectType(BodyHit, Start, BodyTraceEnd, FQuat::Identity, Bodies, FCollisionShape::MakeSphere(BodyRadius), Params)
+			: World.LineTraceSingleByObjectType(BodyHit, Start, BodyTraceEnd, Bodies, Params);
+
+		if (bHitBody)
+		{
+			OutHit = BodyHit;
+			return true;
+		}
+		if (bHitWall)
+		{
+			OutHit = WallHit;
+			return true;
+		}
+		return false;
 	}
 }
 
@@ -53,7 +76,8 @@ void UWeaponFireMode_Hitscan::FirePellet(const FWeaponFireContext& Context, cons
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(ZombieHitscan), false);
 	Params.AddIgnoredActor(Context.Weapon);
 	Params.AddIgnoredActor(Context.InstigatorPawn);
-	const FCollisionObjectQueryParams Objects = MakeShotObjectQuery();
+	const float BodyRadius = Context.Definition->ShotHitRadius;
+	const AZombieWeapon& Weapon = *Context.Weapon;
 
 	FVector SegmentStart = Context.Origin;
 	FVector TracerStart = Context.Origin;
@@ -67,11 +91,12 @@ void UWeaponFireMode_Hitscan::FirePellet(const FWeaponFireContext& Context, cons
 	{
 		const FVector SegmentEnd = SegmentStart + ShotDirection * RemainingRange;
 		FHitResult Hit;
-		if (!World->LineTraceSingleByObjectType(Hit, SegmentStart, SegmentEnd, Objects, Params))
+		if (!TraceShotSegment(*World, SegmentStart, SegmentEnd, Params, BodyRadius, Hit))
 		{
 			if (Effects && Context.Definition->bDrawTracers)
 			{
-				Effects->SpawnTracer(TracerStart, SegmentEnd, Context.TracerColor, Context.Definition->TracerWidth, 0.12f);
+				Effects->SpawnTracer(Weapon.ToVisualShotHeight(TracerStart), Weapon.ToVisualShotHeight(SegmentEnd), Context.TracerColor,
+					Context.Definition->TracerWidth, 0.12f);
 			}
 			break;
 		}
@@ -111,12 +136,13 @@ void UWeaponFireMode_Hitscan::FirePellet(const FWeaponFireContext& Context, cons
 		}
 		else if (Effects)
 		{
-			Effects->PlayEffect(Context.Definition->ImpactEffect, Hit.ImpactPoint);
+			Effects->PlayEffect(Context.Definition->ImpactEffect, Weapon.ToVisualShotHeight(Hit.ImpactPoint));
 		}
 
 		if (Effects && Context.Definition->bDrawTracers)
 		{
-			Effects->SpawnTracer(TracerStart, Hit.Location, Context.TracerColor, Context.Definition->TracerWidth, 0.12f);
+			Effects->SpawnTracer(Weapon.ToVisualShotHeight(TracerStart), Weapon.ToVisualShotHeight(Hit.Location), Context.TracerColor,
+				Context.Definition->TracerWidth, 0.12f);
 		}
 
 		// Only walls bounce a round; a round that stopped in an enemy is spent.

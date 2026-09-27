@@ -83,6 +83,60 @@ void UZombieAudioSubsystem::PlaySoundAtLocation(const FZombieSoundSpec& Sound, c
 	}
 }
 
+void UZombieAudioSubsystem::PlayCreatureSoundAtLocation(const FZombieSoundSpec& Sound, const FVector& Location)
+{
+	const float DistanceGain = GetCreatureDistanceGain(Location);
+	if (DistanceGain <= 0.01f)
+	{
+		return;
+	}
+
+	if (USoundBase* Variant = PickVariant(Sound))
+	{
+		const float Pitch = 1.0f + FMath::FRandRange(-Sound.PitchVariance, Sound.PitchVariance);
+		UGameplayStatics::PlaySoundAtLocation(this, Variant, Location, Sound.Volume * DistanceGain * GetCategoryVolume(Sound.Category), Pitch);
+	}
+}
+
+float UZombieAudioSubsystem::GetCreatureDistanceGain(const FVector& Location) const
+{
+	// Measured from the player pawn, not the audio listener: the listener is the camera, which
+	// hangs high above the floor and would flatten every distance difference that matters here.
+	float NearestDistanceSquared = TNumericLimits<float>::Max();
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PlayerController = It->Get();
+		if (!PlayerController || !PlayerController->IsLocalController())
+		{
+			continue;
+		}
+
+		const APawn* Pawn = PlayerController->GetPawn();
+		FVector ListenerLocation;
+		if (Pawn)
+		{
+			ListenerLocation = Pawn->GetActorLocation();
+		}
+		else
+		{
+			FVector FrontDirection, RightDirection;
+			PlayerController->GetAudioListenerPosition(ListenerLocation, FrontDirection, RightDirection);
+		}
+		NearestDistanceSquared = FMath::Min(NearestDistanceSquared, static_cast<float>(FVector::DistSquared2D(ListenerLocation, Location)));
+	}
+
+	if (NearestDistanceSquared == TNumericLimits<float>::Max())
+	{
+		return 1.0f;
+	}
+
+	const UZombieAudioSettings* Settings = UZombieAudioSettings::GetOrLoadDefault();
+	const float Inner = Settings->CreatureFullVolumeRadius;
+	const float Outer = FMath::Max(Settings->CreatureAudibleDistance, Inner + 1.0f);
+	const float Fade = FMath::Clamp((FMath::Sqrt(NearestDistanceSquared) - Inner) / (Outer - Inner), 0.0f, 1.0f);
+	return FMath::Square(1.0f - Fade);
+}
+
 void UZombieAudioSubsystem::PlaySound2D(const FZombieSoundSpec& Sound)
 {
 	if (USoundBase* Variant = PickVariant(Sound))

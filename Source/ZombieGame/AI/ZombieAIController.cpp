@@ -1,6 +1,7 @@
 #include "ZombieAIController.h"
 #include "AI/BehaviorTrees/ZombieAIAssetSubsystem.h"
 #include "AI/Blackboard/ZombieBlackboardKeys.h"
+#include "AI/ZombieAISettings.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/Zombies/ZombieArchetypeDataAsset.h"
@@ -14,6 +15,8 @@
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "ZombieGame.h"
+
+const FName AZombieAIController::GunshotNoiseTag(TEXT("Gunshot"));
 
 AZombieAIController::AZombieAIController()
 {
@@ -53,7 +56,10 @@ void AZombieAIController::ApplyArchetypePerception(const UZombieArchetypeDataAss
 	SightConfig->PeripheralVisionAngleDegrees = Archetype->PeripheralVisionHalfAngle;
 	SightConfig->SetMaxAge(Archetype->MemorySeconds);
 
-	HearingConfig->HearingRange = Archetype->HearingRange;
+	// Every zombie has to be able to hear a gunshot anywhere inside the alert radius, whatever its
+	// archetype's everyday hearing is like.
+	const UZombieAISettings* AISettings = UZombieAISettings::GetOrLoadDefault();
+	HearingConfig->HearingRange = FMath::Max(Archetype->HearingRange, AISettings ? AISettings->GunshotAlertRadius : 0.0f);
 	HearingConfig->SetMaxAge(Archetype->MemorySeconds);
 
 	MemorySeconds = Archetype->MemorySeconds;
@@ -144,7 +150,7 @@ void AZombieAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 	}
 	else if (Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
 	{
-		HandleHearingUpdate(Stimulus);
+		HandleHearingUpdate(Actor, Stimulus);
 	}
 }
 
@@ -177,20 +183,33 @@ void AZombieAIController::HandleSightUpdate(AActor* Actor, const FAIStimulus& St
 	}
 
 	// Lost sight: head for where they were last seen, and only forget them once memory expires.
+	// An aggravation that outlasts plain memory is kept rather than shortened.
 	BlackboardComponent->SetValueAsVector(ZombieBlackboardKeys::InvestigateLocation, Stimulus.StimulusLocation);
-	GetWorld()->GetTimerManager().SetTimer(ForgetTargetTimer, this, &AZombieAIController::ForgetTarget,
-		FMath::Max(MemorySeconds, 0.1f), false);
+	if (GetWorld()->GetTimerManager().GetTimerRemaining(ForgetTargetTimer) < MemorySeconds)
+	{
+		StartForgetTimer(MemorySeconds);
+	}
 }
 
-void AZombieAIController::HandleHearingUpdate(const FAIStimulus& Stimulus)
+void AZombieAIController::HandleHearingUpdate(AActor* Actor, const FAIStimulus& Stimulus)
 {
 	if (!Stimulus.WasSuccessfullySensed())
 	{
 		return;
 	}
 
-	// "Gunshots attract zombies very well": a noise is worth investigating even mid-chase, but it
-	// must never displace a target the zombie can actually see.
+	// "Gunshots attract zombies very well": a player's gunshot inside the alert radius aggravates
+	// outright - the zombie hunts the shooter, and every further shot keeps it hunting.
+	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
+	const APawn* OwnPawn = GetPawn();
+	if (Stimulus.Tag == GunshotNoiseTag && IsHostileTarget(Actor) && OwnPawn && Settings
+		&& FVector::DistSquared2D(OwnPawn->GetActorLocation(), Stimulus.StimulusLocation) <= FMath::Square(Settings->GunshotAlertRadius))
+	{
+		Aggravate(Actor);
+		return;
+	}
+
+	// Any other noise is worth investigating, but never displaces a target the zombie already has.
 	UBlackboardComponent* BlackboardComponent = GetBlackboardComponent();
 	if (BlackboardComponent->GetValueAsObject(ZombieBlackboardKeys::TargetActor) == nullptr)
 	{
@@ -198,11 +217,63 @@ void AZombieAIController::HandleHearingUpdate(const FAIStimulus& Stimulus)
 	}
 }
 
+void AZombieAIController::Aggravate(AActor* Hostile)
+{
+	UBlackboardComponent* BlackboardComponent = GetBlackboardComponent();
+	if (!BlackboardComponent || !IsHostileTarget(Hostile))
+	{
+		return;
+	}
+
+	if (BlackboardComponent->GetValueAsObject(ZombieBlackboardKeys::TargetActor) != Hostile)
+	{
+		if (AZombieCharacter* Zombie = Cast<AZombieCharacter>(GetPawn()))
+		{
+			Zombie->PlayAlertSound();
+		}
+	}
+	BlackboardComponent->SetValueAsObject(ZombieBlackboardKeys::TargetActor, Hostile);
+	BlackboardComponent->ClearValue(ZombieBlackboardKeys::InvestigateLocation);
+
+	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
+	StartForgetTimer(FMath::Max(MemorySeconds, Settings ? Settings->AggravatedMemorySeconds : 0.0f));
+}
+
+bool AZombieAIController::CanSee(const AActor& Actor) const
+{
+	const UAIPerceptionComponent* Perception = GetAIPerceptionComponent();
+	return Perception && Perception->HasActiveStimulus(Actor, UAISense::GetSenseID<UAISense_Sight>());
+}
+
+void AZombieAIController::StartForgetTimer(float Seconds)
+{
+	GetWorld()->GetTimerManager().SetTimer(ForgetTargetTimer, this, &AZombieAIController::ForgetTarget, FMath::Max(Seconds, 0.1f), false);
+}
+
 void AZombieAIController::ForgetTarget()
 {
-	if (UBlackboardComponent* BlackboardComponent = GetBlackboardComponent())
+	UBlackboardComponent* BlackboardComponent = GetBlackboardComponent();
+	if (!BlackboardComponent)
 	{
-		BlackboardComponent->ClearValue(ZombieBlackboardKeys::TargetActor);
-		BlackboardComponent->SetValueAsBool(ZombieBlackboardKeys::InAttackRange, false);
+		return;
 	}
+
+	// A target still in sight, or standing right next to the zombie, is not forgotten - check again
+	// later instead. Losing a player who is breathing down its neck is what made zombies "switch off".
+	const AActor* Target = Cast<AActor>(BlackboardComponent->GetValueAsObject(ZombieBlackboardKeys::TargetActor));
+	const APawn* OwnPawn = GetPawn();
+	const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
+	if (IsValid(Target) && OwnPawn && Settings)
+	{
+		const bool bClose = FVector::DistSquared2D(Target->GetActorLocation(), OwnPawn->GetActorLocation())
+			<= FMath::Square(Settings->ProximityAwarenessRadius);
+		if (bClose || CanSee(*Target))
+		{
+			StartForgetTimer(1.0f);
+			return;
+		}
+	}
+
+	BlackboardComponent->ClearValue(ZombieBlackboardKeys::TargetActor);
+	BlackboardComponent->SetValueAsBool(ZombieBlackboardKeys::InAttackRange, false);
 }

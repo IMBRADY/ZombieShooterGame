@@ -59,6 +59,29 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pacing", meta = (ClampMin = "0.0"))
 	float MinSpawnDistanceFromPlayer = 900.0f;
 
+	/**
+	 * Zombies never spawn on screen: a spawn point inside any player's view, grown by this margin
+	 * (world units) on every side so nothing pops in right at the edge, is skipped.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pacing", meta = (ClampMin = "0.0"))
+	float OffscreenSpawnMargin = 250.0f;
+
+	/**
+	 * Once a player has been in a room and no zombie is left alive in it, the room is cleared and
+	 * nothing spawns there again - unless every room with spawn points is cleared, in which case
+	 * the rest of the budget comes in through cleared rooms (off screen, as far away as possible)
+	 * rather than leaving the sector impossible to finish.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pacing")
+	bool bKeepClearedRoomsClear = true;
+
+	/**
+	 * If every spawn point is on screen for this long, the queue gives up waiting and uses the
+	 * point furthest from the players - a last resort so a sector can always be finished.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pacing", meta = (ClampMin = "0.0"))
+	float MaxOffscreenWaitSeconds = 10.0f;
+
 	// --- Tier mix ---
 
 	/**

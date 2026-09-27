@@ -130,6 +130,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation", meta = (ClampMin = "0.0"))
 	float MuzzleOffset = 70.0f;
 
+	/**
+	 * Extra width a hitscan round has against bodies (walls still use a thin line). Collision
+	 * capsules are narrower than the sprites drawn on them, so without this a round that visibly
+	 * crossed a zombie's shoulder could pass straight by its capsule.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation", meta = (ClampMin = "0.0"))
+	float ShotHitRadius = 20.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
 	FZombieEffectSpec MuzzleFlash;
 

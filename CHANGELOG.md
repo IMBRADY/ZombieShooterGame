@@ -5,6 +5,82 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Playtest fixes: the game is now called Rotshot, plus AI, hit detection, spawning and audio
+
+User playtest report, item by item.
+
+- **Renamed "Dead Sector" → "Rotshot".** Main-menu title (`ZombieMainMenuWidget.cpp`) and the window
+  title (`ProjectDisplayedTitle` in `Config/DefaultGame.ini`). The module, target and `.uproject`
+  are still `ZombieGame`. Renaming those is a disruptive rename with no player-visible effect.
+- **Zombies pausing in place next to the player.** Four separate causes, all fixed:
+  - The combat service measured attack reach in 3D while the chase task measured arrival in 2D. When
+    they disagreed, the chase said "arrived", the attack branch said "out of range", and the zombie
+    stood still. Both are now planar (`BTService_ZombieCombatState`, `BTTask_ZombieAttack`).
+  - An unreachable noise froze the investigate branch. The move failed, the key stayed set, and the
+    key's own decorator re-picked the branch every frame. The branch is now "investigate, or give up
+    and forget the noise" (`ZombieAIAssetSubsystem::BuildInvestigateBranch`).
+  - A zombie shoved onto an obstacle or wall cell got no flow direction and steered straight at the
+    player, into the obstacle. `UZombieFlowFieldSubsystem::GetFlowDirection` now heads for the
+    walkable neighbour cell nearest a player.
+  - Stuck detection in `UBTTask_ZombieChaseTarget`: a chasing zombie that moves less than
+    `StuckDistanceThreshold` (30) in `StuckCheckInterval` (0.75 s) follows a real navmesh path for
+    `StuckRecoverySeconds` (1.5 s), then returns to the flow field.
+- **Alerted zombies calming down mid-firefight.** Hearing a gunshot only set an investigate point.
+  It never refreshed the chase, so a zombie that had lost sight dropped its target after 6 s even
+  while the player kept shooting. Gunshots are now tagged (`AZombieAIController::GunshotNoiseTag`).
+  Every zombie within `GunshotAlertRadius` (3200, walls don't muffle it) is **aggravated**: it hunts
+  the shooter directly for `AggravatedMemorySeconds` (12 s), and every further shot restarts that
+  timer. Archetype hearing ranges are raised to at least the alert radius. A target that is still
+  visible, or within `ProximityAwarenessRadius` (550), is never forgotten.
+- **Zombies shot from far away not reacting.** Taking damage now aggravates the zombie toward
+  whoever shot it, from any range (`AZombieCharacter::HandleDamageReceived` →
+  `AZombieAIController::Aggravate`). Related: a player within `ProximityAwarenessRadius` with a clear
+  line to the zombie is noticed whichever way the zombie is facing. Sight has a cone, and a zombie
+  walking away from you used to ignore you right behind it.
+- **Shots rendering through a zombie's shoulder without hitting.** Two causes:
+  - The collision capsule (radius 34) is narrower than the sprite drawn on it (~50 at the
+    shoulders). Hitscan rounds now sweep a sphere of `UWeaponDataAsset::ShotHitRadius` (20) against
+    bodies. Walls still use a thin line, so rounds still thread gaps.
+  - Tracers were drawn at capsule-centre height, about 80 units above the flat character sprites.
+    Under the angled camera that shifted every tracer on screen compared with the floor-level sprites,
+    so a tracer could appear to cross a zombie the round had actually missed. Tracers, impacts and
+    muzzle flashes are now drawn just above the sprite plane (`AZombieWeapon::ToVisualShotHeight`).
+- **Zombies colliding with corpses.** The corpse's capsule collision was already off, but the corpse
+  stayed registered with RVO avoidance, so the living horde steered around and jostled against
+  every body. Avoidance is now switched off on death.
+- **Odd shadows on zombies standing over corpses.** Corpse and live sprites were flat masked quads
+  at the same height, so they z-fought and the corpse's drop shadow and blood pool flickered through
+  the live zombie. Corpses now lie lower (3 units above the feet instead of 10), with a lower
+  translucency sort priority.
+- **Zombie sounds fade with distance.** New `UZombieAudioSubsystem::PlayCreatureSoundAtLocation`.
+  Full volume within `CreatureFullVolumeRadius` (350), quadratic fade to silence at
+  `CreatureAudibleDistance` (2200), measured from the player pawn rather than the high camera
+  listener. Every zombie sound goes through it: groans, screams, attacks, hurt, death, abilities,
+  hazard puddles, exploder blasts. Sounds that would be inaudible aren't started at all.
+- **No spawning on screen, and cleared rooms stay clear.** The Spawn Director now works with rooms
+  (`FZombieSpawnArea`: a room's bounds plus its spawn points, from
+  `USectorGeneratorComponent::GetZombieSpawnAreas`), not a flat point list.
+  - A spawn point inside any player's camera view, plus `OffscreenSpawnMargin` (250), is never
+    used. This is tested in camera space against the real orthographic view, so it also works
+    headless.
+  - A room is **cleared** once the player has been in it and no zombie is left alive inside it.
+    After that nothing spawns there again (`bKeepClearedRoomsClear`).
+  - Two fallbacks so a sector can always be finished. If *every* room is cleared, the remaining
+    budget comes in through cleared rooms, still off screen. If every point stays on screen for
+    `MaxOffscreenWaitSeconds` (10 s), the point furthest from the player is used.
+- **New zombie and gunshot sounds** (`Tools/AssetGen/generate_audio.py`). The old gunshots were
+  bit-crushed (the pistol had 246 distinct sample levels, which is exactly the 8-bit sound). The
+  zombie voices were a raw sawtooth. Both are now modelled acoustically:
+  - Gunshots: a broadband crack, then a muzzle blast whose filter collapses within ~20 ms, then a low
+    body thump. Pistol, SMG and rifle add the clack of the action cycling. All of it is played
+    through a synthetic concrete-room reverb.
+  - Voices: a glottal pulse source with jitter, shimmer and vocal fry, through morphing vowel formant
+    filters, with breath noise, throat rattle, low-pass and room reverb. Separate recipes cover
+    groans, shrieks, tank roars, poison gargles, necromancer hisses, hurt grunts, deaths (with a gore
+    layer), swipes, boss roars, acid splashes and casts.
+  - File names are unchanged, so no Data Asset changes are needed. Pickup and UI blips stay
+    deliberately retro.
+
 ### Automation test suite, and a unity-build clash it exposed
 
 - **`Source/ZombieGame/Tests/`** — 20 Unreal Automation Tests under `ZombieGame.*`, covering the

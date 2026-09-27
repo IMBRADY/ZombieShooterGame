@@ -92,7 +92,7 @@ void UBTTask_ZombieAttack::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* No
 		// Re-check reach at the moment of impact: backing off during the wind-up is the whole
 		// point of having one.
 		const float Reach = Zombie->GetAttackRange();
-		if (FVector::DistSquared(Zombie->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(Reach))
+		if (FVector::DistSquared2D(Zombie->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(Reach))
 		{
 			Zombie->PerformAttack(Target);
 		}

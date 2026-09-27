@@ -42,6 +42,12 @@ public:
 	virtual void Deinitialize() override;
 
 	void PlaySoundAtLocation(const FZombieSoundSpec& Sound, const FVector& Location);
+
+	/**
+	 * A zombie's voice: like PlaySoundAtLocation, but faded by distance from the nearest player so
+	 * nearby zombies are loud and distant ones faint or silent (see UZombieAudioSettings).
+	 */
+	void PlayCreatureSoundAtLocation(const FZombieSoundSpec& Sound, const FVector& Location);
 	void PlaySound2D(const FZombieSoundSpec& Sound);
 
 	/** Plays one of the shared one-shots from the audio settings by name ("UI.Click", ...). */
@@ -59,6 +65,9 @@ public:
 
 private:
 	float GetCategoryVolume(EZombieSoundCategory Category) const;
+
+	/** 1 near the players, falling to 0 at CreatureAudibleDistance. */
+	float GetCreatureDistanceGain(const FVector& Location) const;
 	USoundBase* PickVariant(const FZombieSoundSpec& Sound) const;
 
 	UAudioComponent* StartLoop(const FZombieSoundSpec& Sound);

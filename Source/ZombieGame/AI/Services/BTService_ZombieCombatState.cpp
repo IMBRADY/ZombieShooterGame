@@ -1,5 +1,8 @@
 #include "BTService_ZombieCombatState.h"
 #include "AI/Blackboard/ZombieBlackboardKeys.h"
+#include "AI/ZombieAIController.h"
+#include "AI/ZombieAISettings.h"
+#include "CollisionQueryParams.h"
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -63,6 +66,23 @@ AActor* UBTService_ZombieCombatState::FindNearestPlayer(const AZombieCharacter& 
 	return Nearest;
 }
 
+AActor* UBTService_ZombieCombatState::FindPlayerWithinReach(const AZombieCharacter& Zombie, float Radius)
+{
+	AActor* Nearest = FindNearestPlayer(Zombie);
+	if (!Nearest || FVector::DistSquared2D(Nearest->GetActorLocation(), Zombie.GetActorLocation()) > FMath::Square(Radius))
+	{
+		return nullptr;
+	}
+
+	// Only through open space: a player on the far side of a wall is not "right there".
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ZombieProximityAwareness), false);
+	Params.AddIgnoredActor(&Zombie);
+	Params.AddIgnoredActor(Nearest);
+	const bool bBlocked = Zombie.GetWorld()->LineTraceTestByObjectType(Zombie.GetActorLocation(), Nearest->GetActorLocation(),
+		FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+	return bBlocked ? nullptr : Nearest;
+}
+
 void UBTService_ZombieCombatState::ClearCombatKeys(UBlackboardComponent& Blackboard, FName TargetKey, FName RangeKey)
 {
 	Blackboard.ClearValue(TargetKey);
@@ -86,6 +106,20 @@ void UBTService_ZombieCombatState::TickNode(UBehaviorTreeComponent& OwnerComp, u
 
 	AActor* Target = Cast<AActor>(Blackboard->GetValueAsObject(TargetActorKey));
 
+	// A player right next to a zombie is noticed whichever way it faces. Sight alone has a cone, and
+	// a zombie shambling away from you should not ignore you breathing down its neck.
+	if (!IsTargetAlive(Target) && !bAlwaysHunt)
+	{
+		const UZombieAISettings* Settings = UZombieAISettings::GetOrLoadDefault();
+		AZombieAIController* ZombieController = Cast<AZombieAIController>(OwnerComp.GetAIOwner());
+		AActor* Nearby = Settings ? FindPlayerWithinReach(*Zombie, Settings->ProximityAwarenessRadius) : nullptr;
+		if (Nearby && ZombieController)
+		{
+			ZombieController->Aggravate(Nearby);
+			Target = Nearby;
+		}
+	}
+
 	// A dead target is not a target: without this the whole horde would keep swinging at a corpse.
 	if (!IsTargetAlive(Target))
 	{
@@ -98,7 +132,10 @@ void UBTService_ZombieCombatState::TickNode(UBehaviorTreeComponent& OwnerComp, u
 		Blackboard->SetValueAsObject(TargetActorKey, Target);
 	}
 
-	const float Distance = FVector::Dist(Zombie->GetActorLocation(), Target->GetActorLocation());
+	// Planar distance, matching the chase task's arrival test. A 3D distance here disagreed with it
+	// whenever the two capsules' centres sat at different heights: the chase declared "arrived", the
+	// attack branch said "not in range", and the zombie stood still next to the player.
+	const float Distance = FVector::Dist2D(Zombie->GetActorLocation(), Target->GetActorLocation());
 	Blackboard->SetValueAsBool(InAttackRangeKey, Distance <= Zombie->GetAttackRange());
 
 	const UZombieArchetypeDataAsset* Archetype = Zombie->GetArchetype();

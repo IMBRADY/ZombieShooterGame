@@ -81,7 +81,7 @@ void AZombieHazardZone::Setup(const UZombieHazardDataAsset* InDefinition, Zombie
 
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		Audio->PlaySoundAtLocation(Definition->SpawnSound, GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Definition->SpawnSound, GetActorLocation());
 	}
 }
 

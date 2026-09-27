@@ -43,6 +43,9 @@ protected:
 
 private:
 	static AActor* FindNearestPlayer(const AZombieCharacter& Zombie);
+
+	/** The nearest living player if within Radius with no wall between them, else null. */
+	static AActor* FindPlayerWithinReach(const AZombieCharacter& Zombie, float Radius);
 	static bool IsTargetAlive(const AActor* Target);
 	static void ClearCombatKeys(UBlackboardComponent& Blackboard, FName TargetKey, FName RangeKey);
 };

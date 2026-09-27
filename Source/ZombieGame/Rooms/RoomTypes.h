@@ -124,3 +124,16 @@ namespace RoomTile
 		return Tile != ERoomTile::Empty;
 	}
 }
+
+/**
+ * One room's zombie spawn points together with the room's footprint, so the Spawn Director can
+ * reason about rooms (has the player cleared this one?) rather than a flat list of points.
+ */
+struct FZombieSpawnArea
+{
+	/** World-space bounds of the room, walls included. */
+	FBox Bounds = FBox(ForceInit);
+
+	/** World-space spawn points from the room's 'S' tiles. Never empty for a published area. */
+	TArray<FVector> SpawnPoints;
+};

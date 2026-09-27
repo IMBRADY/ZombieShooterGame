@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/Zombies/ZombieArchetypeDataAsset.h"
 #include "Components/ActorComponent.h"
+#include "Rooms/RoomTypes.h"
 #include "SpawnDirectorComponent.generated.h"
 
 class AController;
@@ -34,10 +35,10 @@ public:
 	USpawnDirectorComponent();
 
 	/**
-	 * Computes the sector's budget, fills the spawn queue, and starts draining it. A boss
-	 * archetype, if given, is held back until ReleaseBoss is called.
+	 * Computes the sector's budget, fills the spawn queue, and starts draining it into the given
+	 * rooms. A boss archetype, if given, is held back until ReleaseBoss is called.
 	 */
-	void BeginSector(int32 Sector, const TArray<FVector>& SpawnPoints, const UZombieArchetypeDataAsset* BossArchetype);
+	void BeginSector(int32 Sector, const TArray<FZombieSpawnArea>& SpawnAreas, const UZombieArchetypeDataAsset* BossArchetype);
 
 	/** Wakes the held-back boss at a location (the player walked into the boss room). */
 	AZombieCharacter* ReleaseBoss(const FVector& Location);
@@ -74,7 +75,22 @@ private:
 	void SpawnNextZombie();
 	void ScheduleNextSpawn();
 
+	/**
+	 * Picks where the next zombie appears: never on screen, preferring rooms the player hasn't
+	 * cleared and points outside the "not in their lap" radius. False if nowhere is acceptable yet.
+	 */
 	bool TrySelectSpawnLocation(FVector& OutLocation) const;
+
+	/** Last resort after MaxOffscreenWaitSeconds: the point furthest from every player. */
+	FVector GetFurthestSpawnPoint(const TArray<FVector>& PlayerLocations) const;
+
+	void GatherPlayerLocations(TArray<FVector>& OutLocations) const;
+
+	/** True if Location is inside any local player's camera view, grown by Margin world units. */
+	bool IsOnScreenForAnyPlayer(const FVector& Location, float Margin) const;
+
+	/** Timer-driven: marks rooms the player has been in that no longer hold a living zombie. */
+	void UpdateClearedAreas();
 
 	void HandleEnemyDied(AZombieCharacter* Zombie, AController* Killer);
 	void CheckSectorCleared(const FVector& LastKillLocation);
@@ -88,8 +104,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<const UZombieArchetypeDataAsset> PendingBoss;
 
-	TArray<FVector> AvailableSpawnPoints;
+	TArray<FZombieSpawnArea> SpawnAreas;
+	TArray<bool> AreaVisited;
+	TArray<bool> AreaCleared;
+	float SpawnBlockedSeconds = 0.0f;
+
 	FTimerHandle SpawnTimer;
+	FTimerHandle AreaCheckTimer;
 	int32 CurrentSector = 0;
 	bool bSectorActive = false;
 };

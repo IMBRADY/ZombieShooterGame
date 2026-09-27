@@ -31,6 +31,19 @@ public:
 	/** Drops the current target and stops the tree - used when the pawn dies. */
 	void AbandonCombat();
 
+	/**
+	 * Makes the zombie hunt Hostile right now, whether or not it can see them - it was shot, heard
+	 * a gunshot nearby, or the player walked up behind it. The zombie keeps hunting for at least
+	 * AggravatedMemorySeconds even out of sight; every further call restarts that clock.
+	 */
+	void Aggravate(AActor* Hostile);
+
+	/** True for actors a zombie should hunt: player-controlled pawns, never other zombies. */
+	static bool IsHostileTarget(const AActor* Actor);
+
+	/** The tag weapons put on their noise events, so a gunshot can be told apart from other noise. */
+	static const FName GunshotNoiseTag;
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Perception")
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
@@ -46,11 +59,13 @@ private:
 	void ApplyArchetypePerception(const UZombieArchetypeDataAsset* Archetype);
 
 	void HandleSightUpdate(AActor* Actor, const FAIStimulus& Stimulus);
-	void HandleHearingUpdate(const FAIStimulus& Stimulus);
+	void HandleHearingUpdate(AActor* Actor, const FAIStimulus& Stimulus);
 
-	/** True for actors a zombie should hunt: player-controlled pawns, never other zombies. */
-	static bool IsHostileTarget(const AActor* Actor);
+	/** Whether sight currently reports Actor - hearing and aggravation never count as seeing. */
+	bool CanSee(const AActor& Actor) const;
 
+	/** (Re)starts the countdown after which an unseen target is dropped. */
+	void StartForgetTimer(float Seconds);
 	void ForgetTarget();
 
 	FTimerHandle ForgetTargetTimer;

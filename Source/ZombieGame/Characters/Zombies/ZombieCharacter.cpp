@@ -22,6 +22,13 @@ namespace
 {
 	constexpr float BaseCapsuleRadius = 34.0f;
 	constexpr float ZombieSpriteHeightAboveFeet = 10.0f;
+
+	/**
+	 * Corpses lie lower than any living sprite. Sprites are flat masked quads, so a zombie walking
+	 * over a corpse at the same height z-fought with it - the corpse's shadow and blood pool
+	 * flickered through the live zombie's body.
+	 */
+	constexpr float ZombieCorpseHeightAboveFeet = 3.0f;
 	constexpr float AnimationUpdateInterval = 0.15f;
 	constexpr float ZombieWalkAnimationSpeedThreshold = 25.0f;
 
@@ -191,7 +198,7 @@ void AZombieCharacter::PerformAttack(AActor* Target)
 	UGameplayStatics::ApplyDamage(Target, ScaledAttackDamage, GetController(), this, UDamageType_Melee::StaticClass());
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		Audio->PlaySoundAtLocation(Archetype ? Archetype->AttackSound : FZombieSoundSpec(), GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Archetype ? Archetype->AttackSound : FZombieSoundSpec(), GetActorLocation());
 	}
 }
 
@@ -206,7 +213,7 @@ void AZombieCharacter::PlayAlertSound()
 	GLastAlertSoundTime = Now;
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		Audio->PlaySoundAtLocation(Archetype->AlertSound, GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Archetype->AlertSound, GetActorLocation());
 	}
 }
 
@@ -219,7 +226,7 @@ void AZombieCharacter::PlayIdleSound()
 
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		Audio->PlaySoundAtLocation(Archetype ? Archetype->IdleSound : FZombieSoundSpec(), GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Archetype ? Archetype->IdleSound : FZombieSoundSpec(), GetActorLocation());
 	}
 	GetWorldTimerManager().SetTimer(IdleSoundTimer, this, &AZombieCharacter::PlayIdleSound, FMath::FRandRange(6.0f, 16.0f), false);
 }
@@ -250,6 +257,19 @@ void AZombieCharacter::HandleDamageReceived(float Amount, AActor* Causer, const 
 {
 	BodySprite->Flash(FLinearColor::White, 0.08f);
 
+	// Being shot is the loudest alert there is, from any range: hunt whoever fired, even if they are
+	// far outside sight radius. Sight and hearing alone left long-range victims standing idle.
+	if (AZombieAIController* ZombieController = Cast<AZombieAIController>(GetController()))
+	{
+		const AController* DamageInstigator = DamageComponent->GetLastDamageInstigator();
+		AActor* Attacker = DamageInstigator ? DamageInstigator->GetPawn() : nullptr;
+		if (!Attacker && Causer)
+		{
+			Attacker = Causer->GetInstigator();
+		}
+		ZombieController->Aggravate(Attacker);
+	}
+
 	if (Archetype && HealthComponent)
 	{
 		AbilityComponent->UpdatePhase(HealthComponent->GetHealthFraction());
@@ -266,7 +286,7 @@ void AZombieCharacter::HandleDamageReceived(float Amount, AActor* Causer, const 
 		LastHurtSoundTime = Now;
 		if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 		{
-			Audio->PlaySoundAtLocation(Archetype ? Archetype->HurtSound : FZombieSoundSpec(), GetActorLocation());
+			Audio->PlayCreatureSoundAtLocation(Archetype ? Archetype->HurtSound : FZombieSoundSpec(), GetActorLocation());
 		}
 	}
 }
@@ -289,7 +309,7 @@ void AZombieCharacter::HandlePhaseChanged(int32 NewPhase)
 
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		Audio->PlaySoundAtLocation(Archetype ? Archetype->AlertSound : FZombieSoundSpec(), GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Archetype ? Archetype->AlertSound : FZombieSoundSpec(), GetActorLocation());
 	}
 }
 
@@ -307,6 +327,10 @@ void AZombieCharacter::HandleDeath()
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
+
+	// A corpse must not be an obstacle. With collision off it was still registered with RVO
+	// avoidance, so the living horde steered around (and jostled against) every body on the floor.
+	GetCharacterMovement()->SetAvoidanceEnabled(false);
 	GetWorldTimerManager().ClearTimer(AnimationTimer);
 	GetWorldTimerManager().ClearTimer(IdleSoundTimer);
 	StatusEffectComponent->ClearAll();
@@ -319,6 +343,8 @@ void AZombieCharacter::HandleDeath()
 
 	BodySprite->PlayAnimation(TEXT("Death"), true);
 	BodySprite->SetTint(Archetype ? Archetype->Tint * 0.8f : FLinearColor::Gray);
+	BodySprite->SetRelativeLocation(FVector(0.0f, 0.0f, -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + ZombieCorpseHeightAboveFeet));
+	BodySprite->SetTranslucentSortPriority(-1);
 
 	if (UZombieEffectsSubsystem* Effects = UZombieEffectsSubsystem::Get(this))
 	{
@@ -327,7 +353,7 @@ void AZombieCharacter::HandleDeath()
 	}
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
 	{
-		Audio->PlaySoundAtLocation(Archetype ? Archetype->DeathSound : FZombieSoundSpec(), GetActorLocation());
+		Audio->PlayCreatureSoundAtLocation(Archetype ? Archetype->DeathSound : FZombieSoundSpec(), GetActorLocation());
 	}
 
 	AbilityComponent->NotifyDied();

@@ -78,6 +78,14 @@ public:
 	FOnWeaponReloadChanged OnReloadChanged;
 	FOnWeaponFired OnFired;
 
+	/**
+	 * Drops a gameplay-height point (shots travel at capsule-centre height) onto the plane the
+	 * character sprites are drawn on, for placing tracers and impacts. The camera looks down at an
+	 * angle, so anything drawn ~80 units above the sprites appears visibly shifted on screen; a
+	 * tracer drawn at trace height could be seen crossing a zombie the round had actually missed.
+	 */
+	FVector ToVisualShotHeight(const FVector& GameplayLocation) const;
+
 private:
 	void FinishReload();
 	void BroadcastAmmo();

@@ -1,8 +1,11 @@
 """Synthesises every sound and music loop the game uses into SourceAssets/Audio (16-bit WAV),
 plus audio_manifest.json for the Unreal import script.
 
-Retro-flavoured synthesis: oscillators, noise, envelopes and simple filters for effects; a small
-step sequencer (drums, bass, arpeggio, pads) for music. The two sector-music layers share tempo
+Effects are modelled acoustically rather than as chiptune: gunshots are a crack, a muzzle blast
+with a collapsing filter and a body thump played into a synthetic concrete room; zombie voices are
+a glottal pulse source through vowel formant filters with jitter, vocal fry and breath noise.
+Pickups/UI keep their deliberately retro blips. Music is a small step sequencer (drums, bass,
+arpeggio, pads). The two sector-music layers share tempo
 and length so the audio manager can crossfade them sample-accurately by combat intensity.
 
     python Tools/AssetGen/generate_audio.py
@@ -112,26 +115,169 @@ def save(folder, name, x, rate=SFX_RATE, loop=False, category="Effects"):
     manifest["sounds"].append({"name": name, "folder": folder, "file": os.path.relpath(path, ROOT), "loop": loop, "category": category})
 
 
+# --- acoustic building blocks ----------------------------------------------------------------------
+# The effects used to be raw oscillators and bit-crushed noise, which read as 8-bit chiptune. These
+# model the real thing instead: a room to hear it in, a vocal tract, a time-varying filter.
+
+def room_reverb(x, rng, seconds=0.6, wet=0.25, damping=4000.0):
+    """Convolves with a synthetic impulse response of an empty concrete room: a few discrete early
+    reflections off nearby walls, then a dense exponentially decaying tail that darkens as it goes."""
+    n = int(seconds * SFX_RATE)
+    t = np.arange(n) / SFX_RATE
+    tail = rng.standard_normal(n) * np.exp(-t * 6.9 / seconds)
+    tail = lowpass(tail, damping) * 0.6 + lowpass(tail, damping * 0.3) * 0.4
+    ir = tail * 0.35
+    for delay, gain in ((0.009, 0.55), (0.017, 0.4), (0.026, 0.3), (0.041, 0.2)):
+        ir[int(delay * SFX_RATE)] += gain
+    ir /= np.sqrt(np.sum(ir ** 2)) + 1e-9
+    reverberant = signal.fftconvolve(x, ir)
+    dry = pad_to(x, len(reverberant))
+    out = dry + wet * reverberant
+    return out
+
+
+def fade_tail(x, seconds=0.05):
+    n = min(len(x), int(seconds * SFX_RATE))
+    out = np.copy(x)
+    out[-n:] *= np.linspace(1, 0, n)
+    return out
+
+
+def sweeping_lowpass(x, start_hz, end_hz, time_constant):
+    """A lowpass whose cutoff glides from start_hz to end_hz: approximated by crossfading a bank of
+    fixed filters, which is plenty for a burst of noise."""
+    t = np.arange(len(x)) / SFX_RATE
+    cutoff = end_hz + (start_hz - end_hz) * np.exp(-t / time_constant)
+    bank = np.geomspace(end_hz, start_hz, 6)
+    filtered = [lowpass(x, f) for f in bank]
+    out = np.zeros(len(x))
+    position = np.interp(np.log(cutoff), np.log(bank), np.arange(len(bank)))
+    for i in range(len(bank)):
+        weight = np.clip(1 - np.abs(position - i), 0, 1)
+        out += filtered[i] * weight
+    return out
+
+
+def smooth_noise(n, rng, rate_hz):
+    """Band-limited random wander in roughly [-1, 1], for natural pitch and loudness drift."""
+    points = max(4, int(n / SFX_RATE * rate_hz) + 2)
+    coarse = rng.standard_normal(points)
+    return np.interp(np.linspace(0, points - 1, n), np.arange(points), coarse)
+
+
+def glottal_source(rng, f0, jitter=0.015, shimmer=0.12, fry=0.0):
+    """A voice's buzz: a Rosenberg glottal pulse per cycle (differentiated, as the airflow is),
+    with cycle-to-cycle pitch jitter and loudness shimmer. fry > 0 makes alternate cycles weaker -
+    the subharmonic crackle of a rotten, strained throat."""
+    n = len(f0)
+    drift = 1 + jitter * smooth_noise(n, rng, 40)
+    phase = np.cumsum(f0 * drift) / SFX_RATE
+    frac = phase % 1.0
+    opening, closing = 0.4, 0.62
+    pulse = np.where(frac < opening, 0.5 * (1 - np.cos(np.pi * frac / opening)),
+                     np.where(frac < closing, np.cos(0.5 * np.pi * (frac - opening) / (closing - opening)), 0.0))
+    flow = np.diff(pulse, prepend=0.0)
+    cycle = np.floor(phase).astype(int)
+    amps = np.clip(1 + shimmer * rng.standard_normal(cycle.max() + 2), 0.2, 2.0)
+    if fry > 0:
+        amps[::2] *= 1 - fry
+    return flow * amps[cycle] * 60
+
+
+def vowel_filter(x, formants):
+    """Parallel formant resonators - (centre Hz, bandwidth Hz, gain) - the shape of the mouth."""
+    out = np.zeros(len(x))
+    for centre, bandwidth, gain in formants:
+        b, a = signal.iirpeak(centre, centre / bandwidth, SFX_RATE)
+        out += signal.lfilter(b, a, x) * gain
+    return out
+
+
+VOWELS = {
+    "uh": ((520, 90, 1.0), (1150, 110, 0.5), (2400, 170, 0.18)),
+    "oh": ((450, 80, 1.0), (800, 100, 0.6), (2500, 170, 0.12)),
+    "aw": ((620, 100, 1.0), (1000, 110, 0.55), (2500, 180, 0.15)),
+    "ah": ((750, 120, 1.0), (1250, 130, 0.5), (2600, 180, 0.2)),
+    "eh": ((580, 100, 1.0), (1750, 140, 0.45), (2600, 180, 0.2)),
+    "ee": ((300, 70, 1.0), (2200, 160, 0.35), (3000, 200, 0.15)),
+}
+
+
+def voice(rng, seconds, f0_start, f0_end, vowel_from, vowel_to, breath=0.15, fry=0.2, attack=0.12, release=0.5,
+          growl=0.0, flutter=0.2, tract=1.0):
+    """One zombie vocalisation. Pitch glides f0_start -> f0_end with a slow wander, the mouth morphs
+    between two vowels, breath noise rides on top, and growl adds a fast rough amplitude modulation
+    (a wet rattle in the throat). tract < 1 lowers every formant: a bigger, deeper body."""
+    n = int(seconds * SFX_RATE)
+    t = np.arange(n) / SFX_RATE
+    contour = f0_start * (f0_end / f0_start) ** (t / seconds)
+    f0 = contour * (1 + 0.04 * smooth_noise(n, rng, 3))
+    source = glottal_source(rng, f0, jitter=0.02 + 0.03 * fry, shimmer=0.1 + 0.2 * fry, fry=fry)
+    source += breath * bandpass(noise(n, rng), 400, 5000) * 3
+
+    scale = lambda formants: tuple((c * tract, bw * tract, g) for c, bw, g in formants)
+    start = vowel_filter(source, scale(VOWELS[vowel_from]))
+    end = vowel_filter(source, scale(VOWELS[vowel_to]))
+    morph = np.clip(t / seconds, 0, 1) ** 1.3
+    x = start * (1 - morph) + end * morph
+
+    if growl > 0:
+        rattle = 0.5 + 0.5 * np.sin(2 * np.pi * np.cumsum(28 + 10 * smooth_noise(n, rng, 6)) / SFX_RATE)
+        x *= 1 - growl + growl * rattle
+    x *= np.clip(1 + flutter * smooth_noise(n, rng, 7), 0.2, 2)
+
+    shape = np.clip(t / attack, 0, 1) ** 0.7 * np.clip((seconds - t) / release, 0, 1) ** 1.5
+    x = highpass(lowpass(x * shape, 4200), 70)
+    return normalise(drive(x / (np.max(np.abs(x)) + 1e-9), 1.4))
+
+
+def vocal(rng, base, seconds, rough=0.4, formants=None, wobble=6.0, rise=0.0):
+    """Short human-ish vocalisation used for the player and spell casts - kept for its call sites."""
+    return voice(rng, seconds, base, base * (1 + rise), "uh", "ah" if rise >= 0 else "oh", breath=0.1 + 0.2 * rough,
+                 fry=0.1 + 0.2 * rough, attack=min(0.05, seconds * 0.2), release=seconds * 0.6, flutter=0.1)
+
+
 # --- weapons -------------------------------------------------------------------------------------
 
-def gunshot(rng, body_hz, crack, length, bass=0.5, bits=None):
+def gunshot(rng, body_hz, crack, length, bass=0.5, room=0.5, action_delay=None):
+    """A firearm in a concrete building: a sharp broadband crack, a muzzle blast whose brightness
+    collapses within milliseconds, a low body thump, optionally the mechanical clack of the action
+    cycling, all played into a reverberant room. No bit-crushing - that is what made them sound 8-bit."""
     n = int(length * SFX_RATE)
-    blast = lowpass(noise(n, rng), crack) * env(n, 0.001, length * 0.35)
-    thump = sweep(body_hz * 2.2, body_hz, length) * env(n, 0.001, length * 0.3) * bass
-    tail = lowpass(noise(n, rng), crack * 0.35) * env(n, 0.01, length) * 0.35
-    x = drive(blast + thump + tail, 2.0)
-    return normalise(crush(x, bits) if bits else x)
+    t = np.arange(n) / SFX_RATE
+
+    k = int(0.0012 * SFX_RATE)
+    crack_burst = np.zeros(n)
+    crack_burst[:k] = rng.uniform(-1, 1, k) * np.linspace(1, 0.2, k)
+    crack_burst = highpass(crack_burst, 1500)
+
+    blast = sweeping_lowpass(noise(n, rng), crack, crack * 0.12, 0.018) * np.exp(-t / (length * 0.09))
+    thump = sweep(body_hz * 2.8, body_hz * 0.75, length) * np.exp(-t / 0.05) * bass
+    x = crack_burst * 1.4 + blast + thump * 1.2
+
+    if action_delay:
+        at = int(action_delay * SFX_RATE)
+        m = int(0.03 * SFX_RATE)
+        ping = (np.sin(2 * np.pi * 3100 * np.arange(m) / SFX_RATE) * 0.5 + bandpass(noise(m, rng), 2000, 6000))
+        x[at:at + m] += ping[:max(0, min(m, n - at))] * np.exp(-np.arange(m) / (0.006 * SFX_RATE))[:max(0, min(m, n - at))] * 0.12
+
+    x = drive(x, 1.8)
+    x = room_reverb(x, rng, seconds=0.35 + room * 0.6, wet=0.2 + room * 0.25, damping=3000)
+    x = pad_to(x, int((length + 0.25 + room * 0.4) * SFX_RATE))
+    return normalise(fade_tail(lowpass(highpass(x, 45), 9000)))
 
 
 def weapons():
+    # body Hz, blast brightness, length, bass, room size, action (bolt/slide) delay
     specs = {
-        "Pistol": (140, 4200, 0.28, 0.6, 7), "Revolver": (95, 3500, 0.5, 0.9, None), "SMG": (170, 5200, 0.18, 0.4, 7),
-        "Shotgun": (70, 2600, 0.65, 1.0, None), "Rifle": (120, 4800, 0.32, 0.7, None), "Sniper": (80, 6000, 0.9, 0.9, None),
+        "Pistol": (150, 7000, 0.3, 0.6, 0.45, 0.07), "Revolver": (105, 6000, 0.45, 0.9, 0.6, None),
+        "SMG": (170, 7500, 0.22, 0.45, 0.35, 0.045), "Shotgun": (75, 4200, 0.6, 1.0, 0.75, None),
+        "Rifle": (125, 8000, 0.35, 0.75, 0.6, 0.06), "Sniper": (85, 9000, 0.7, 0.95, 0.9, None),
     }
-    for name, (body, crack, length, bass, bits) in specs.items():
+    for name, (body, crack, length, bass, room, action) in specs.items():
         for v in range(3):
             rng = np.random.default_rng(zlib.crc32(name.encode()) % 1000 + v)
-            save("Weapons", "SFX_%s_Fire_%d" % (name, v), gunshot(rng, body * (1 + 0.05 * v), crack, length, bass, bits))
+            save("Weapons", "SFX_%s_Fire_%d" % (name, v), gunshot(rng, body * (1 + 0.04 * (v - 1)), crack * (1 + 0.05 * v), length, bass, room, action))
 
     for v in range(2):
         rng = np.random.default_rng(50 + v)
@@ -173,56 +319,86 @@ def weapons():
 
 # --- creatures -----------------------------------------------------------------------------------
 
-def vocal(rng, base, seconds, rough=0.4, formants=((500, 1100), (700, 1500)), wobble=6.0, rise=0.0):
-    """A moan: a buzzy glottal source through vowel formants, with pitch wobble."""
-    t = t_axis(seconds)
-    pitch = base * (1 + rise * t / seconds) * (1 + 0.06 * np.sin(2 * np.pi * wobble * t) + 0.03 * rng.standard_normal(len(t)).cumsum() / 200)
-    phase = 2 * np.pi * np.cumsum(pitch) / SFX_RATE
-    source = 2 * ((phase / (2 * np.pi)) % 1.0) - 1 + rough * noise(len(t), rng)
-    x = np.zeros(len(t))
-    for lo, hi in formants:
-        x += bandpass(source, lo, hi)
-    shape = env(len(t), seconds * 0.25, seconds * 0.9, curve=2.0)
-    return normalise(drive(x * shape, 1.8))
+def gore(rng, seconds):
+    """A wet impact: dull low thud plus a few squelchy filtered-noise bursts."""
+    n = int(seconds * SFX_RATE)
+    t = np.arange(n) / SFX_RATE
+    x = lowpass(noise(n, rng), 500) * np.exp(-t / 0.08) * 1.5 + sweep(110, 45, seconds) * np.exp(-t / 0.06)
+    for _ in range(3):
+        at = int(rng.uniform(0.0, seconds * 0.5) * SFX_RATE)
+        m = int(0.07 * SFX_RATE)
+        squelch = bandpass(noise(m, rng), 250, 1400) * np.exp(-np.arange(m) / (0.02 * SFX_RATE))
+        x[at:at + m] += squelch[:max(0, min(m, n - at))] * 0.6
+    return x
 
 
 def creatures():
+    # Every group is a real vocal tract doing something different, with per-variant differences in
+    # pitch, vowel and length so a horde never repeats itself. Low-passed and reverberant: these sit
+    # in the mix under the gunfire rather than cutting through it like the old sawtooth moans.
     groups = {
-        "Groan": dict(base=85, seconds=1.3, rough=0.35),
-        "Shriek": dict(base=260, seconds=0.7, rough=0.6, formants=((900, 2200), (1800, 3500)), rise=0.4),
-        "Roar": dict(base=55, seconds=1.6, rough=0.7, formants=((250, 700), (500, 1200))),
-        "Gurgle": dict(base=110, seconds=1.0, rough=0.9, formants=((300, 900),), wobble=14),
-        "Whisper": dict(base=180, seconds=1.4, rough=1.6, formants=((1200, 3200),), wobble=3),
+        # idle: a low, slow, tired moan
+        "Groan": lambda rng, v: voice(rng, 1.4 + 0.2 * v, 88 - 5 * v, 70 - 4 * v, "uh", ("oh", "aw", "uh", "oh")[v],
+                                      breath=0.18, fry=0.35, attack=0.25, release=0.7, growl=0.15),
+        # alert (spotted you): a strained, rising then breaking howl - raw, not a whistle
+        "Shriek": lambda rng, v: voice(rng, 0.85 + 0.08 * v, 230 + 18 * v, 170 + 10 * v, "ah", ("eh", "aw", "ah", "eh")[v],
+                                       breath=0.4, fry=0.25, attack=0.05, release=0.35, growl=0.3, flutter=0.3),
+        # tank / heavy: a deep chesty roar
+        "Roar": lambda rng, v: voice(rng, 1.5 + 0.1 * v, 72 - 4 * v, 55 - 3 * v, "aw", "ah", breath=0.3, fry=0.55,
+                                     attack=0.12, release=0.6, growl=0.45, tract=0.8),
+        # poison: a choking, bubbling gargle
+        "Gurgle": lambda rng, v: voice(rng, 1.0 + 0.1 * v, 105 + 6 * v, 85, "oh", "uh", breath=0.25, fry=0.4,
+                                       attack=0.1, release=0.5, growl=0.75, flutter=0.35),
+        # necromancer: an airy, half-voiced hiss
+        "Whisper": lambda rng, v: voice(rng, 1.3, 140 + 10 * v, 120, "ee", "ah", breath=1.4, fry=0.1,
+                                        attack=0.3, release=0.7, growl=0.0, flutter=0.4),
     }
-    for group, params in groups.items():
+    for group, make in groups.items():
         for v in range(4):
             rng = np.random.default_rng(zlib.crc32(group.encode()) % 997 + v)
-            p = dict(params)
-            p["base"] = p["base"] * (0.9 + 0.07 * v)
-            save("Zombies", "SFX_Zombie_%s_%d" % (group, v), vocal(rng, **p))
+            x = make(rng, v)
+            save("Zombies", "SFX_Zombie_%s_%d" % (group, v), normalise(fade_tail(room_reverb(x, rng, 0.5, 0.18)), 0.8))
 
     for v in range(3):
         rng = np.random.default_rng(300 + v)
-        save("Zombies", "SFX_Zombie_Hurt_%d" % v, vocal(rng, 120 + 20 * v, 0.35, rough=0.8))
-        n = int(0.5 * SFX_RATE)
-        splat = lowpass(noise(n, rng), 1200) * env(n, 0.002, 0.35, curve=5)
-        save("Zombies", "SFX_Zombie_Death_%d" % v, normalise(drive(splat + 0.5 * vocal(rng, 90, 0.5, rough=0.9)[:n], 2)))
-        n = int(0.3 * SFX_RATE)
-        swipe = bandpass(noise(n, rng), 800, 4000) * env(n, 0.05, 0.25, curve=3)
-        save("Zombies", "SFX_Zombie_Swipe_%d" % v, normalise(swipe, 0.6))
+        hurt = voice(rng, 0.32, 150 + 15 * v, 110, "ah", "uh", breath=0.3, fry=0.3, attack=0.01, release=0.2, growl=0.3)
+        save("Zombies", "SFX_Zombie_Hurt_%d" % v, normalise(fade_tail(room_reverb(hurt, rng, 0.4, 0.15)), 0.7))
+
+        death_voice = voice(rng, 0.9, 120 - 10 * v, 60, "aw", "uh", breath=0.3, fry=0.6, attack=0.02, release=0.6, growl=0.4)
+        death = pad_to(death_voice, len(death_voice)) * 0.7 + pad_to(gore(rng, 0.5), len(death_voice))
+        save("Zombies", "SFX_Zombie_Death_%d" % v, normalise(fade_tail(room_reverb(drive(death, 1.5), rng, 0.45, 0.2)), 0.8))
+
+        # a heavy arm cutting the air: a whoosh whose pitch sweeps up then down
+        n = int(0.32 * SFX_RATE)
+        t = np.arange(n) / SFX_RATE
+        air = noise(n, rng)
+        whoosh = bandpass(air, 300, 900) * (1 - t / 0.32) + bandpass(air, 900, 2600) * np.sin(np.pi * t / 0.32)
+        whoosh *= np.sin(np.pi * np.clip(t / 0.3, 0, 1)) ** 2
+        save("Zombies", "SFX_Zombie_Swipe_%d" % v, normalise(lowpass(whoosh, 3500), 0.55))
 
     for v in range(2):
         rng = np.random.default_rng(400 + v)
-        roar = vocal(rng, 45 + 6 * v, 2.4, rough=0.9, formants=((150, 500), (400, 1000), (900, 1800)))
-        save("Zombies", "SFX_Boss_Roar_%d" % v, normalise(drive(roar + 0.4 * sweep(60, 35, 2.4) * env(len(roar), 0.3, 2.2, curve=2), 2)))
+        body = voice(rng, 2.4, 62 + 5 * v, 44, "aw", "ah", breath=0.35, fry=0.6, attack=0.2, release=1.0, growl=0.5, tract=0.7)
+        layer = voice(rng, 2.4, 124 + 7 * v, 90, "ah", "aw", breath=0.3, fry=0.4, attack=0.3, release=1.0, growl=0.4, tract=0.75)
+        n = len(body)
+        sub = sweep(58, 34, 2.4) * env(n, 0.3, 2.2, curve=2)
+        roar = drive(body + 0.5 * layer + 0.5 * sub, 1.6)
+        save("Zombies", "SFX_Boss_Roar_%d" % v, normalise(fade_tail(room_reverb(roar, rng, 1.1, 0.3, 2500))))
 
     for v in range(2):
         rng = np.random.default_rng(500 + v)
         n = int(0.6 * SFX_RATE)
-        bubble = sum(tone(300 + 180 * k + 40 * v, 0.6) * env(n, 0.01 + 0.12 * k, 0.08) for k in range(4))
-        save("Zombies", "SFX_Acid_Splash_%d" % v, normalise(lowpass(bubble + 0.3 * noise(n, rng) * env(n, 0.001, 0.2), 2500), 0.6))
-        save("Zombies", "SFX_Necro_Cast_%d" % v, normalise(sweep(200, 900, 0.9, shape="saw") * env(int(0.9 * SFX_RATE), 0.3, 0.9) * 0.5
-                                                          + vocal(rng, 150, 0.9, rough=1.2, formants=((600, 2000),))[:int(0.9 * SFX_RATE)]))
+        splash = gore(rng, 0.6) * 0.6
+        for k in range(5):
+            at = int((0.08 + 0.09 * k + 0.02 * v) * SFX_RATE)
+            m = int(0.05 * SFX_RATE)
+            bubble = np.sin(2 * np.pi * np.cumsum(np.linspace(350 + 60 * k, 700 + 80 * k, m)) / SFX_RATE)
+            splash[at:at + m] += bubble * np.exp(-np.arange(m) / (0.012 * SFX_RATE)) * 0.25
+        save("Zombies", "SFX_Acid_Splash_%d" % v, normalise(lowpass(splash, 3000), 0.6))
+
+        chant = voice(rng, 0.9, 110, 150, "oh", "ee", breath=1.0, fry=0.2, attack=0.3, release=0.4)
+        shimmer = bandpass(noise(len(chant), rng), 2500, 7000) * env(len(chant), 0.4, 0.5, curve=2) * 0.15
+        save("Zombies", "SFX_Necro_Cast_%d" % v, normalise(fade_tail(room_reverb(chant + shimmer, rng, 0.9, 0.35)), 0.7))
 
 
 # --- player, pickups and UI ------------------------------------------------------------------------

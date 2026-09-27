@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Rooms/Procedural/SectorLayoutBuilder.h"
+#include "Rooms/RoomTypes.h"
 #include "SectorGeneratorComponent.generated.h"
 
 class APlayerStart;
@@ -49,6 +50,9 @@ public:
 
 	/** Every zombie spawn point in the sector, from the modules' 'S' tiles. */
 	const TArray<FVector>& GetZombieSpawnLocations() const { return ZombieSpawnLocations; }
+
+	/** The same spawn points grouped by room, with each room's bounds. */
+	const TArray<FZombieSpawnArea>& GetZombieSpawnAreas() const { return ZombieSpawnAreas; }
 
 	/** PlayerStart placed in the generated start room. Null until a sector has been generated. */
 	APlayerStart* GetGeneratedPlayerStart() const { return GeneratedPlayerStart; }
@@ -116,6 +120,7 @@ private:
 	TObjectPtr<AZombieBossArenaTrigger> BossTrigger;
 
 	TArray<FVector> ZombieSpawnLocations;
+	TArray<FZombieSpawnArea> ZombieSpawnAreas;
 	FBox SectorBounds = FBox(ForceInit);
 	FVector BossSpawnLocation = FVector::ZeroVector;
 };

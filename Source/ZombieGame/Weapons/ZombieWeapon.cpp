@@ -1,4 +1,5 @@
 #include "ZombieWeapon.h"
+#include "AI/ZombieAIController.h"
 #include "Audio/ZombieAudioSubsystem.h"
 #include "Core/ZombieStatSource.h"
 #include "Engine/World.h"
@@ -150,6 +151,18 @@ EWeaponFireResult AZombieWeapon::TryFire(const FVector& AimDirection)
 	return EWeaponFireResult::Fired;
 }
 
+FVector AZombieWeapon::ToVisualShotHeight(const FVector& GameplayLocation) const
+{
+	// Just above the sprites (drawn 10-12 units above the feet), so tracers render over bodies.
+	constexpr float VisualShotHeightAboveFeet = 16.0f;
+
+	const AActor* Carrier = GetOwner() ? GetOwner() : this;
+	float HalfHeight = 0.0f;
+	float Radius = 0.0f;
+	Carrier->GetSimpleCollisionCylinder(Radius, HalfHeight);
+	return FVector(GameplayLocation.X, GameplayLocation.Y, Carrier->GetActorLocation().Z - HalfHeight + VisualShotHeightAboveFeet);
+}
+
 FVector AZombieWeapon::GetMuzzleLocation(const FVector& Direction) const
 {
 	const AActor* Carrier = GetOwner() ? GetOwner() : this;
@@ -161,7 +174,7 @@ void AZombieWeapon::PlayFireFeedback(const FVector& Muzzle, const FVector& Direc
 {
 	if (UZombieEffectsSubsystem* Effects = UZombieEffectsSubsystem::Get(this))
 	{
-		Effects->PlayEffect(Definition->MuzzleFlash, Muzzle, Direction.Rotation().Yaw);
+		Effects->PlayEffect(Definition->MuzzleFlash, ToVisualShotHeight(Muzzle), Direction.Rotation().Yaw);
 	}
 
 	if (UZombieAudioSubsystem* Audio = UZombieAudioSubsystem::Get(this))
@@ -169,8 +182,9 @@ void AZombieWeapon::PlayFireFeedback(const FVector& Muzzle, const FVector& Direc
 		Audio->PlaySoundAtLocation(Definition->FireSound, Muzzle);
 	}
 
-	// "Gunshots attract zombies very well": every shot is a hearing stimulus across NoiseRange.
-	UAISense_Hearing::ReportNoiseEvent(this, Muzzle, 1.0f, GetInstigator(), EffectiveStats.NoiseRange);
+	// "Gunshots attract zombies very well": every shot is a hearing stimulus across NoiseRange,
+	// tagged so zombies inside the alert radius hunt the shooter instead of just investigating.
+	UAISense_Hearing::ReportNoiseEvent(this, Muzzle, 1.0f, GetInstigator(), EffectiveStats.NoiseRange, AZombieAIController::GunshotNoiseTag);
 
 	OnFired.Broadcast(Definition->ShakeStrength);
 }

@@ -49,6 +49,9 @@ public:
 	int32 GetDistanceToNearestPlayer(const FVector& WorldLocation) const;
 
 private:
+	/** From an off-field or directionless cell, the way to the walkable neighbour nearest a player. */
+	bool GetDirectionTowardBestNeighbour(const FVector& WorldLocation, const FIntPoint& Cell, FVector& OutDirection) const;
+
 	void Rebuild();
 	void StartRebuildTimer();
 

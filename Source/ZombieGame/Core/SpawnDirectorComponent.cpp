@@ -3,12 +3,22 @@
 #include "Characters/Zombies/ZombieEnemyManager.h"
 #include "Core/SpawnDirectorSettings.h"
 #include "Core/ZombieGameState.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
 #include "Utilities/ZombiePrimaryAssetLoader.h"
 #include "ZombieGame.h"
+
+namespace
+{
+	/** How often rooms are checked for being cleared - cheap, and nobody notices half a second. */
+	constexpr float SpawnAreaCheckInterval = 0.5f;
+
+	/** Standing in a doorway counts as being in the room. */
+	constexpr float SpawnAreaVisitTolerance = 60.0f;
+}
 
 USpawnDirectorComponent::USpawnDirectorComponent()
 {
@@ -59,7 +69,7 @@ void USpawnDirectorComponent::GatherEligibleArchetypes(int32 Sector, TArray<UZom
 	});
 }
 
-void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& SpawnPoints, const UZombieArchetypeDataAsset* BossArchetype)
+void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FZombieSpawnArea>& InSpawnAreas, const UZombieArchetypeDataAsset* BossArchetype)
 {
 	StopSector();
 
@@ -70,7 +80,7 @@ void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& S
 		return;
 	}
 
-	if (SpawnPoints.Num() == 0)
+	if (InSpawnAreas.Num() == 0)
 	{
 		UE_LOG(LogZombieGame, Error, TEXT("Sector %d has no zombie spawn points; nothing will spawn."), Sector);
 		return;
@@ -80,9 +90,13 @@ void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& S
 	GatherEligibleArchetypes(Sector, EligibleArchetypes);
 
 	CurrentSector = Sector;
-	AvailableSpawnPoints = SpawnPoints;
+	SpawnAreas = InSpawnAreas;
+	AreaVisited.Init(false, SpawnAreas.Num());
+	AreaCleared.Init(false, SpawnAreas.Num());
+	SpawnBlockedSeconds = 0.0f;
 	PendingBoss = BossArchetype;
 	bSectorActive = true;
+	GetWorld()->GetTimerManager().SetTimer(AreaCheckTimer, this, &USpawnDirectorComponent::UpdateClearedAreas, SpawnAreaCheckInterval, true);
 	Enemies->SetSectorScaling(Settings->GetScalingForSector(Sector));
 
 	BuildSpawnQueue(Sector, Settings->GetBudgetForSector(Sector), EligibleArchetypes);
@@ -93,7 +107,7 @@ void USpawnDirectorComponent::BeginSector(int32 Sector, const TArray<FVector>& S
 		// Nothing affordable ever came out of the budget - treat the sector as immediately clear
 		// rather than leaving the run stuck waiting on zombies that will never arrive.
 		UE_LOG(LogZombieGame, Warning, TEXT("Sector %d produced an empty spawn queue; clearing immediately."), Sector);
-		CheckSectorCleared(SpawnPoints[0]);
+		CheckSectorCleared(SpawnAreas[0].Bounds.GetCenter());
 		return;
 	}
 
@@ -163,53 +177,177 @@ void USpawnDirectorComponent::ScheduleNextSpawn()
 		FMath::Max(Settings->SpawnInterval, 0.05f), false);
 }
 
-bool USpawnDirectorComponent::TrySelectSpawnLocation(FVector& OutLocation) const
+void USpawnDirectorComponent::GatherPlayerLocations(TArray<FVector>& OutLocations) const
 {
-	const USpawnDirectorSettings* Settings = SettingsAsset.Get();
-	const float MinDistance = Settings ? Settings->MinSpawnDistanceFromPlayer : 900.0f;
-
-	TArray<FVector> PlayerLocations;
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		if (const APawn* Pawn = It->IsValid() ? It->Get()->GetPawn() : nullptr)
 		{
-			PlayerLocations.Add(Pawn->GetActorLocation());
+			OutLocations.Add(Pawn->GetActorLocation());
+		}
+	}
+}
+
+bool USpawnDirectorComponent::IsOnScreenForAnyPlayer(const FVector& Location, float Margin) const
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PlayerController = It->Get();
+		if (!PlayerController || !PlayerController->IsLocalController() || !PlayerController->PlayerCameraManager)
+		{
+			continue;
+		}
+
+		// Tested in camera space against the real view rather than by projecting to pixels, so it
+		// also works with no viewport at all (headless runs) and for the angled orthographic camera.
+		const FMinimalViewInfo& View = PlayerController->PlayerCameraManager->GetCameraCacheView();
+		const FVector Local = View.Rotation.UnrotateVector(Location - View.Location);
+
+		float AspectRatio = View.AspectRatio > 0.0f ? View.AspectRatio : 16.0f / 9.0f;
+		int32 ViewportWidth = 0;
+		int32 ViewportHeight = 0;
+		PlayerController->GetViewportSize(ViewportWidth, ViewportHeight);
+		if (ViewportWidth > 0 && ViewportHeight > 0)
+		{
+			AspectRatio = static_cast<float>(ViewportWidth) / static_cast<float>(ViewportHeight);
+		}
+
+		float HalfWidth = 0.0f;
+		if (View.ProjectionMode == ECameraProjectionMode::Orthographic)
+		{
+			HalfWidth = View.OrthoWidth * 0.5f;
+		}
+		else if (Local.X > 0.0f)
+		{
+			HalfWidth = Local.X * FMath::Tan(FMath::DegreesToRadians(View.FOV * 0.5f));
+		}
+		else
+		{
+			continue;
+		}
+
+		const float HalfHeight = HalfWidth / AspectRatio;
+		if (FMath::Abs(Local.Y) <= HalfWidth + Margin && FMath::Abs(Local.Z) <= HalfHeight + Margin)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void USpawnDirectorComponent::UpdateClearedAreas()
+{
+	const USpawnDirectorSettings* Settings = SettingsAsset.Get();
+	const UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this);
+	if (!bSectorActive || !Enemies || (Settings && !Settings->bKeepClearedRoomsClear))
+	{
+		return;
+	}
+
+	TArray<FVector> PlayerLocations;
+	GatherPlayerLocations(PlayerLocations);
+
+	for (int32 AreaIndex = 0; AreaIndex < SpawnAreas.Num(); ++AreaIndex)
+	{
+		if (AreaCleared[AreaIndex])
+		{
+			continue;
+		}
+
+		const FBox VisitBounds = SpawnAreas[AreaIndex].Bounds.ExpandBy(SpawnAreaVisitTolerance);
+		for (const FVector& PlayerLocation : PlayerLocations)
+		{
+			AreaVisited[AreaIndex] = AreaVisited[AreaIndex] || VisitBounds.IsInsideXY(PlayerLocation);
+		}
+		if (!AreaVisited[AreaIndex])
+		{
+			continue;
+		}
+
+		const FBox& Bounds = SpawnAreas[AreaIndex].Bounds;
+		const bool bOccupied = Enemies->GetLiveZombies().ContainsByPredicate([&Bounds](const AZombieCharacter* Zombie)
+		{
+			return IsValid(Zombie) && !Zombie->IsDead() && Bounds.IsInsideXY(Zombie->GetActorLocation());
+		});
+		if (!bOccupied)
+		{
+			AreaCleared[AreaIndex] = true;
+			UE_LOG(LogZombieGame, Log, TEXT("Sector %d: room %d cleared - no further spawns there."), CurrentSector, AreaIndex);
+		}
+	}
+}
+
+bool USpawnDirectorComponent::TrySelectSpawnLocation(FVector& OutLocation) const
+{
+	const USpawnDirectorSettings* Settings = SettingsAsset.Get();
+	const float MinDistanceSquared = FMath::Square(Settings ? Settings->MinSpawnDistanceFromPlayer : 900.0f);
+	const float Margin = Settings ? Settings->OffscreenSpawnMargin : 250.0f;
+
+	TArray<FVector> PlayerLocations;
+	GatherPlayerLocations(PlayerLocations);
+
+	// Candidates come from rooms the player has not cleared - or, only once every room is cleared,
+	// from any room. Points outside the "don't spawn in their lap" radius beat ones inside it.
+	// Anything on screen is never a candidate.
+	const bool bAllAreasCleared = !AreaCleared.Contains(false);
+	TArray<FVector> Far;
+	TArray<FVector> Near;
+
+	for (int32 AreaIndex = 0; AreaIndex < SpawnAreas.Num(); ++AreaIndex)
+	{
+		if (AreaCleared[AreaIndex] && !bAllAreasCleared)
+		{
+			continue;
+		}
+
+		for (const FVector& SpawnPoint : SpawnAreas[AreaIndex].SpawnPoints)
+		{
+			if (IsOnScreenForAnyPlayer(SpawnPoint, Margin))
+			{
+				continue;
+			}
+
+			const bool bTooClose = PlayerLocations.ContainsByPredicate([&SpawnPoint, MinDistanceSquared](const FVector& PlayerLocation)
+			{
+				return FVector::DistSquared(SpawnPoint, PlayerLocation) < MinDistanceSquared;
+			});
+			(bTooClose ? Near : Far).Add(SpawnPoint);
 		}
 	}
 
-	if (AvailableSpawnPoints.Num() == 0)
+	const TArray<FVector>& Pool = Far.Num() > 0 ? Far : Near;
+	if (Pool.Num() == 0)
 	{
 		return false;
 	}
 
-	// Prefer points beyond the "don't spawn in their lap" radius; if the player is standing in the
-	// middle of every spawn point, fall back to the furthest rather than refusing to spawn.
-	TArray<FVector> Candidates;
-	FVector FurthestPoint = AvailableSpawnPoints[0];
+	OutLocation = Pool[FMath::RandRange(0, Pool.Num() - 1)];
+	return true;
+}
+
+FVector USpawnDirectorComponent::GetFurthestSpawnPoint(const TArray<FVector>& PlayerLocations) const
+{
+	FVector FurthestPoint = SpawnAreas[0].SpawnPoints[0];
 	float FurthestDistanceSquared = -1.0f;
 
-	for (const FVector& SpawnPoint : AvailableSpawnPoints)
+	for (const FZombieSpawnArea& Area : SpawnAreas)
 	{
-		float NearestPlayerDistanceSquared = TNumericLimits<float>::Max();
-		for (const FVector& PlayerLocation : PlayerLocations)
+		for (const FVector& SpawnPoint : Area.SpawnPoints)
 		{
-			NearestPlayerDistanceSquared = FMath::Min(NearestPlayerDistanceSquared, static_cast<float>(FVector::DistSquared(SpawnPoint, PlayerLocation)));
-		}
+			float NearestPlayerDistanceSquared = TNumericLimits<float>::Max();
+			for (const FVector& PlayerLocation : PlayerLocations)
+			{
+				NearestPlayerDistanceSquared = FMath::Min(NearestPlayerDistanceSquared, static_cast<float>(FVector::DistSquared(SpawnPoint, PlayerLocation)));
+			}
 
-		if (PlayerLocations.Num() == 0 || NearestPlayerDistanceSquared >= FMath::Square(MinDistance))
-		{
-			Candidates.Add(SpawnPoint);
-		}
-
-		if (NearestPlayerDistanceSquared > FurthestDistanceSquared)
-		{
-			FurthestDistanceSquared = NearestPlayerDistanceSquared;
-			FurthestPoint = SpawnPoint;
+			if (NearestPlayerDistanceSquared > FurthestDistanceSquared)
+			{
+				FurthestDistanceSquared = NearestPlayerDistanceSquared;
+				FurthestPoint = SpawnPoint;
+			}
 		}
 	}
-
-	OutLocation = Candidates.Num() > 0 ? Candidates[FMath::RandRange(0, Candidates.Num() - 1)] : FurthestPoint;
-	return true;
+	return FurthestPoint;
 }
 
 void USpawnDirectorComponent::SpawnNextZombie()
@@ -223,10 +361,29 @@ void USpawnDirectorComponent::SpawnNextZombie()
 
 	// At the cap the queue simply waits - the sector's total stays the same, its shape changes.
 	const int32 MaxConcurrent = Settings ? Settings->MaxConcurrentZombies : 40;
-	FVector SpawnLocation;
-	if (Enemies->GetLiveCount() < MaxConcurrent && TrySelectSpawnLocation(SpawnLocation))
+	if (Enemies->GetLiveCount() < MaxConcurrent && SpawnAreas.Num() > 0)
 	{
-		if (Enemies->SpawnZombie(SpawnQueue[0], SpawnLocation, FZombieSpawnOptions()))
+		FVector SpawnLocation;
+		bool bHasLocation = TrySelectSpawnLocation(SpawnLocation);
+		if (bHasLocation)
+		{
+			SpawnBlockedSeconds = 0.0f;
+		}
+		else
+		{
+			// Every spawn point is on screen. Wait for the camera to move on - but not forever, or a
+			// player parked where they can see everything could never finish the sector.
+			SpawnBlockedSeconds += Settings ? Settings->SpawnInterval : 1.0f;
+			if (SpawnBlockedSeconds >= (Settings ? Settings->MaxOffscreenWaitSeconds : 10.0f))
+			{
+				TArray<FVector> PlayerLocations;
+				GatherPlayerLocations(PlayerLocations);
+				SpawnLocation = GetFurthestSpawnPoint(PlayerLocations);
+				bHasLocation = true;
+			}
+		}
+
+		if (bHasLocation && Enemies->SpawnZombie(SpawnQueue[0], SpawnLocation, FZombieSpawnOptions()))
 		{
 			SpawnQueue.RemoveAt(0, EAllowShrinking::No);
 		}
@@ -303,6 +460,7 @@ void USpawnDirectorComponent::StopSector()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(SpawnTimer);
+		World->GetTimerManager().ClearTimer(AreaCheckTimer);
 	}
 	if (UZombieEnemyManager* Enemies = UZombieEnemyManager::Get(this))
 	{
@@ -310,6 +468,8 @@ void USpawnDirectorComponent::StopSector()
 	}
 
 	SpawnQueue.Reset();
-	AvailableSpawnPoints.Reset();
+	SpawnAreas.Reset();
+	AreaVisited.Reset();
+	AreaCleared.Reset();
 	PublishEncounterState();
 }

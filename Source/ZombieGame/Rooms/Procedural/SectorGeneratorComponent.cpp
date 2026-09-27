@@ -209,6 +209,13 @@ bool USectorGeneratorComponent::SpawnRooms(const FSectorLayout& Layout, const US
 
 		ZombieSpawnLocations.Append(Room->GetZombieSpawnLocations());
 		SectorBounds += Room->GetWorldBounds();
+
+		if (Room->GetZombieSpawnLocations().Num() > 0)
+		{
+			FZombieSpawnArea& Area = ZombieSpawnAreas.AddDefaulted_GetRef();
+			Area.Bounds = Room->GetWorldBounds();
+			Area.SpawnPoints = Room->GetZombieSpawnLocations();
+		}
 	}
 	return true;
 }
@@ -323,6 +330,7 @@ void USectorGeneratorComponent::ClearSector()
 	SpawnedRooms.Reset();
 	SpawnedFixtures.Reset();
 	ZombieSpawnLocations.Reset();
+	ZombieSpawnAreas.Reset();
 	SectorBounds = FBox(ForceInit);
 	ExitDoor = nullptr;
 	BossTrigger = nullptr;
