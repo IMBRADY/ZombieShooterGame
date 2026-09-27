@@ -21,9 +21,9 @@
 namespace
 {
 	constexpr float BaseCapsuleRadius = 34.0f;
-	constexpr float SpriteHeightAboveFeet = 10.0f;
+	constexpr float ZombieSpriteHeightAboveFeet = 10.0f;
 	constexpr float AnimationUpdateInterval = 0.15f;
-	constexpr float WalkAnimationSpeedThreshold = 25.0f;
+	constexpr float ZombieWalkAnimationSpeedThreshold = 25.0f;
 
 	/** One scream at a time across the whole horde, so a wave spotting you is a cue, not noise. */
 	constexpr double AlertSoundCooldown = 1.2;
@@ -54,7 +54,7 @@ AZombieCharacter::AZombieCharacter()
 
 	BodySprite = CreateDefaultSubobject<UPixelSpriteComponent>(TEXT("BodySprite"));
 	BodySprite->SetupAttachment(GetCapsuleComponent());
-	BodySprite->SetRelativeLocation(FVector(0.0f, 0.0f, -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + SpriteHeightAboveFeet));
+	BodySprite->SetRelativeLocation(FVector(0.0f, 0.0f, -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + ZombieSpriteHeightAboveFeet));
 
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 	DamageComponent = CreateDefaultSubobject<UDamageComponent>(TEXT("DamageComponent"));
@@ -144,7 +144,7 @@ void AZombieCharacter::UpdateLocomotionAnimation()
 		return;
 	}
 
-	const bool bMoving = GetVelocity().SizeSquared2D() > FMath::Square(WalkAnimationSpeedThreshold);
+	const bool bMoving = GetVelocity().SizeSquared2D() > FMath::Square(ZombieWalkAnimationSpeedThreshold);
 	BodySprite->PlayAnimation(bMoving ? FName(TEXT("Walk")) : FName(TEXT("Idle")));
 }
 

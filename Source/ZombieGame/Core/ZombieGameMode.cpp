@@ -514,7 +514,10 @@ void AZombieGameMode::EndRun()
 		const AZombiePlayerState* PlayerState = Controller ? Controller->GetPlayerState<AZombiePlayerState>() : nullptr;
 		if (Controller && PlayerState)
 		{
-			Controller->ClientShowRunSummary(PlayerState->GetRunStats(), CurrentSector);
+			const FZombieRunStats& Stats = PlayerState->GetRunStats();
+			UE_LOG(LogZombieGame, Log, TEXT("Run over at sector %d: %d kills, %d bosses, $%d earned, %.0f damage taken, %.0fs."),
+				CurrentSector, Stats.Kills, Stats.BossesDefeated, Stats.MoneyEarned, Stats.DamageTaken, Stats.ElapsedSeconds);
+			Controller->ClientShowRunSummary(Stats, CurrentSector);
 		}
 	}
 }

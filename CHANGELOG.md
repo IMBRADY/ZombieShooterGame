@@ -5,6 +5,34 @@ commit-level detail. Newest first.
 
 ## Unreleased
 
+### Automation test suite, and a unity-build clash it exposed
+
+- **`Source/ZombieGame/Tests/`** — 20 Unreal Automation Tests under `ZombieGame.*`, covering the
+  ARCHITECTURE.md §17 list: room grid parsing / malformed-layout rejection / rotation / optional
+  obstacles; the sector generation rules checked independently of the builder over 250 seeded
+  layouts across sectors 1-10 (no overlapping footprints, every room reachable, start and exit
+  distinct, combat quota, min-sector gating, boss arena is the exit on boss sectors); seed
+  determinism (mid-run saves depend on it); the weapon stat pipeline (rarity, upgrade, perks, crit
+  cap); perk stacking (flat before percent, percents add) and restored-tier clamping; armor absorbs
+  before health, death and healing rules; perk / shop / slot / weapon pricing; spawn budget,
+  per-sector scaling and elite tier mix. Each test builds its own transient Data Assets, so
+  rebalancing content never breaks a test. All pass.
+- **Fix:** `ZombieCharacter.cpp` and `ZombiePlayerCharacter.cpp` both defined
+  `SpriteHeightAboveFeet` / `WalkAnimationSpeedThreshold` in anonymous namespaces. Harmless until
+  adding files regrouped the unity build and put them in the same translation unit (C2374). The
+  zombie's copies are now `Zombie`-prefixed.
+- `ZombieSmokeTest` now logs every shop transaction result and reports slot 0 (the slot it
+  upgrades) rather than the active weapon, which made a working upgrade look broken.
+- `AZombieGameMode::EndRun` logs the run summary, so a headless run shows the run actually ended.
+
+### Complete game loop (commit `b3c6f91`)
+
+Weapons (hitscan/projectile, rarity, upgrades), inventory, event-driven UMG HUD, key → exit →
+intermission shop → next sector, perks, loot tables, status effects, Lobber / Exploder / Poison /
+Armored / Necromancer, two multi-phase bosses every 5 sectors, main/pause/settings/death menus,
+mid-run and meta saves, achievements, audio manager with combat-intensity music, generated pixel
+art. See `ROADMAP.md` Milestone 4 for the itemised list.
+
 ### Milestone 3 follow-up — shared chase pathing, and the reason zombies stood still
 
 User report: "zombies spawn but they don't try to chase and kill the player". Two things, one a

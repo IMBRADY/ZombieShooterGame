@@ -151,16 +151,54 @@ need projectiles and status effects, i.e. the Weapons milestone), bosses, and th
 hand-off. Until the shop exists, a cleared sector auto-advances after a delay
 (`AZombieGameMode::bAutoAdvanceOnSectorCleared`).
 
-## Milestone 4 — Weapons
+## Milestone 4 — Complete game loop (commit `b3c6f91`)
 
-Not started. Planned scope: `BaseWeapon` + Hitscan/Projectile split, Weapon Data Asset pipeline,
-ammo, reload, `InventoryComponent`/`WeaponComponent` (deferred since Milestone 2). Gunshots should
-call `UAISense_Hearing::ReportNoiseEvent` — the zombie investigate branch is already built and
-waiting for it.
+Everything between "zombies can kill you" and a playable roguelite run, landed as one pass.
+
+- [x] **Weapons** — `AZombieWeapon` + `UWeaponFireMode` (Hitscan / Projectile) driven entirely by
+      `UWeaponDataAsset`; rarity table (`UWeaponRaritySettings`), one-time upgrade, stat pipeline
+      base → rarity → upgrade → perks (`FWeaponStatsCalculator`), crit/pierce/ricochet, separate ammo,
+      auto-reload when the magazine empties. Gunshots report AI hearing noise. 11 weapons.
+- [x] **Inventory / Weapon components** on the player (3 slots, slot upgrades from the shop).
+- [x] **HUD** (UMG, built in C++, event-driven): health, armor, stamina, money, weapon panel, ammo,
+      reload indicator, slots, crosshair (drawn at the aim point on gamepad), objective, sector.
+- [x] **Sector flow** — key drops from the last zombie → exit unlocks → intermission shop → next sector.
+- [x] **Shop / economy** — `UShopTransactionComponent` (server-validated), `FShopPricing`, per-sector
+      inflation, 1-3 guns + 1-3 perks, ammo refill, armor, med kit, upgrade, slot upgrade, sell/trade,
+      Mystery Box.
+- [x] **Perks** — 16 perk Data Assets as tag-keyed stat modifiers (`IZombieStatSource`), exponential tier
+      costs; fire/poison bullets via status effects.
+- [x] **Loot** — loot tables for common/elite zombies, bosses, treasure chests and the Mystery Box.
+- [x] **Zombies** — Lobber, Exploder, Poison, Armored, Necromancer via composable abilities; two
+      multi-phase bosses (Butcher, Plague Mother) with their own Behavior Tree, every 5 sectors.
+- [x] **Menus** — main menu (Continue / New Run / Settings / Records), pause, settings, death screen with
+      the run summary, statistics.
+- [x] **Saves** — mid-run checkpoint (sector, seed, health, armor, money, weapons, perks, shop purchases)
+      and meta save (settings, lifetime statistics, records, achievements).
+- [x] **Audio** — `UZombieAudioSubsystem` with layered music that rises with combat intensity.
+- [x] **Art** — generated pixel-art sprites and textures, three room themes, imported by the content scripts.
+
+## Milestone 5 — PDF Milestone 4: polish, tests, platform
+
+- [x] Achievements (14 Data Assets) and lifetime statistics.
+- [x] Accessibility options in `UZombieUserSettings`: screen shake, damage flash, toggle sprint,
+      interface scale, auto-fire for semi-automatics.
+- [x] Controller support — full gamepad bindings, stick aim, focusable menus.
+- [x] Steam readiness through `OnlineSubsystem` (platform chosen by config, currently `NULL`).
+- [x] Object pooling for projectiles, effects and loot pickups (`UActorPoolSubsystem`).
+- [x] **Automation test suite** (`Source/ZombieGame/Tests/`, 20 tests, all passing): room grid parsing,
+      validation and rotation; sector generation rules over 250 seeded layouts (no overlap, all rooms
+      reachable, exit ≠ start, combat quota, boss arena on boss sectors, determinism); weapon stat
+      pipeline; perk stacking and clamping; armor-before-health; perk/shop/slot/weapon pricing; spawn
+      budget, scaling and tier mix.
+- [x] Full-loop smoke test (`ZombieSmokeTest N` cheat) verified: 6 sectors including a boss, shop
+      purchases, upgrade, death → run summary.
+- [ ] Inventory-rule tests (need a world + weapon actors - a functional test map rather than unit tests).
+- [ ] Room modules level-streamed instead of spawned as actors (spec §"Room modules should be streamed").
+- [ ] Real Steam SDK hookup (`OnlineSubsystemSteam` in config + App ID) - needs the user's Steamworks account.
+- [ ] Human playtest / balance pass - numbers are all in Data Assets, verified only by the headless run.
 
 ## Later (not yet scoped in detail)
 
-Player death/run-end flow, Shop/Economy, Perks, Loot, Boss system, remaining zombie archetypes,
-UI/HUD, Audio (MetaSounds), Save System (mid-run + meta), level streaming for room modules, Steam
-readiness (OnlineSubsystem), Automation Test suite, performance pass (pooling, Niagara, async
-loading).
+Multiplayer (architecture is replication-ready; not implemented per spec), Workshop support,
+performance profiling at the 120 FPS / hundreds-of-zombies target on real hardware.

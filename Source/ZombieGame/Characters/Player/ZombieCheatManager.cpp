@@ -163,6 +163,10 @@ void UZombieCheatManager::SmokeTestShop()
 
 	ZombieGiveMoney(3000);
 	UShopTransactionComponent* Transactions = PC->GetShopTransactions();
+	if (!Transactions->OnTransactionResult.IsBoundToObject(this))
+	{
+		Transactions->OnTransactionResult.AddUObject(this, &UZombieCheatManager::OnSmokeTestTransaction);
+	}
 	UE_LOG(LogZombieGame, Log, TEXT("[SmokeTest] Shop has %d offers."), Shop->GetOffers().Num());
 	for (const FShopOffer& Offer : Shop->GetOffers())
 	{
@@ -174,8 +178,13 @@ void UZombieCheatManager::SmokeTestShop()
 	Transactions->BuyService(EShopService::AmmoRefill, 0);
 
 	const UInventoryComponent* Inventory = GetPlayerPawn()->FindComponentByClass<UInventoryComponent>();
-	UE_LOG(LogZombieGame, Log, TEXT("[SmokeTest] After shopping: %d weapons, active upgraded=%d."), Inventory ? Inventory->GetWeaponCount() : 0,
-		Inventory && Inventory->GetActiveWeapon() ? Inventory->GetActiveWeapon()->GetUpgradeLevel() : -1);
+	UE_LOG(LogZombieGame, Log, TEXT("[SmokeTest] After shopping: %d weapons, slot 0 upgrade level=%d."), Inventory ? Inventory->GetWeaponCount() : 0,
+		Inventory && Inventory->GetWeaponAt(0) ? Inventory->GetWeaponAt(0)->GetUpgradeLevel() : -1);
+}
+
+void UZombieCheatManager::OnSmokeTestTransaction(bool bSuccess, const FText& Message)
+{
+	UE_LOG(LogZombieGame, Log, TEXT("[SmokeTest] Shop %s: %s"), bSuccess ? TEXT("ok") : TEXT("denied"), *Message.ToString());
 }
 
 void UZombieCheatManager::SmokeTestFinish()

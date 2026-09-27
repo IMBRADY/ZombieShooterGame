@@ -29,6 +29,7 @@ private:
 	void SmokeTestStep();
 	void SmokeTestShop();
 	void SmokeTestFinish();
+	void OnSmokeTestTransaction(bool bSuccess, const FText& Message);
 	APawn* GetPlayerPawn() const;
 
 	FTimerHandle SmokeTestTimer;
